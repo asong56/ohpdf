@@ -1,0 +1,47 @@
+[package]
+name = "ohpdf"
+version = "0.1.0"
+edition = "2021"
+authors = ["OhPDF Contributors"]
+description = "A PDF tool that lives on your computer. No upload. No account. Just PDF."
+license = "MIT"
+repository = "https://github.com/yourusername/ohpdf"
+readme = "README.md"
+keywords = ["pdf", "desktop", "local", "tools"]
+
+[[bin]]
+name = "ohpdf"
+path = "src/main.rs"
+
+[dependencies]
+tao = "0.30"
+wry = "0.46"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+# NOTE: bumped from "0.4" -> "0.8": 0.4's public API in this repo (WriteOptions,
+# Permissions, Document::copy_page_from/rotate_page/add_page, Color, ...) does not
+# exist in the published crate at all; 0.8 is the current release and the names
+# used below (PdfWriteOptions, Permission, Encryption, find_page/graft_object/
+# insert_page, Shape, ...) match its real, documented API.
+mupdf = "0.8"
+tempfile = "3"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
+# Native "open file" dialog. The previous code assumed browser `File` objects
+# expose a `.path` property, which no webview (WebView2 / WKWebView / WebKitGTK)
+# actually provides for security reasons. rfd gives us a real OS file dialog
+# from Rust, so we always get a real absolute path.
+rfd = "0.14"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

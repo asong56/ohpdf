@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OhPDF</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ── */
+    :root {
+      --bg:        #0f0f0f;
+      --surface:   #1a1a1a;
+      --surface2:  #242424;
+      --border:    #2e2e2e;
+      --text:      #e8e8e8;
+      --text-dim:  #888;
+      --accent:    #e8e8e8;
+      --accent-bg: #252525;
+      --danger:    #ff5f5f;
+      --success:   #4ade80;
+      --radius:    10px;
+      --radius-sm: 6px;
+      --font:      -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+      --mono:      "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      --ease:      cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Title bar (drag region) ── */
+    #titlebar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #titlebar .wordmark {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      -webkit-app-region: no-drag;
+    }
+
+    /* ── Main ── */
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 28px 24px 24px;
+    }
+
+    /* ── Home screen ── */
+    #home { display: block; }
+    #home .label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .tool-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 16px 14px;
+      cursor: pointer;
+      transition: background 0.12s var(--ease), border-color 0.12s var(--ease), transform 0.1s var(--ease);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .tool-card:hover {
+      background: var(--surface2);
+      border-color: #3e3e3e;
+    }
+    .tool-card:active { transform: scale(0.98); }
+    .tool-card .icon { font-size: 20px; line-height: 1; }
+    .tool-card .name {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .tool-card .hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    /* ── Drop overlay ── */
+    #drop-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 15, 15, 0.88);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      margin: 8px;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    #drop-overlay.active { display: flex; }
+    #drop-overlay .drop-icon { font-size: 40px; opacity: 0.7; }
+    #drop-overlay .drop-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Task view ── */
+    #task-view { display: none; }
+    #task-view.active { display: block; }
+    #home.hidden { display: none; }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      margin-bottom: 20px;
+      padding: 4px 0;
+      border: none;
+      background: none;
+      transition: color 0.1s;
+    }
+    .back-btn:hover { color: var(--text); }
+
+    .task-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 6px;
+    }
+    .task-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    /* ── File drop zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+      margin-bottom: 16px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #555;
+      background: var(--surface);
+    }
+    .drop-zone .dz-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
+    .drop-zone .dz-text { font-size: 13px; color: var(--text-dim); }
+    .drop-zone .dz-hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    /* ── File list ── */
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .file-item .fi-icon { font-size: 16px; flex-shrink: 0; }
+    .file-item .fi-name {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-item .fi-size {
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .file-item .fi-remove {
+      flex-shrink: 0;
+      cursor: pointer;
+      font-size: 14px;
+      color: #555;
+      border: none;
+      background: none;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.1s;
+    }
+    .file-item .fi-remove:hover { color: var(--danger); }
+
+    /* Drag-to-reorder handle */
+    .file-item .fi-drag {
+      cursor: grab;
+      color: #444;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .file-item.dragging { opacity: 0.4; }
+
+    /* ── Controls ── */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+    .field-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      padding: 9px 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.12s;
+      font-family: var(--font);
+    }
+    .field-input:focus { border-color: #555; }
+    .field-input[type="password"] { letter-spacing: 0.1em; }
+    .field-input[type="range"] {
+      padding: 0;
+      cursor: pointer;
+      accent-color: var(--text);
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .range-val {
+      font-size: 12px;
+      color: var(--text-dim);
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Page picker ── */
+    .page-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .page-chip {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      background: var(--surface);
+      color: var(--text-dim);
+    }
+    .page-chip:hover { border-color: #555; color: var(--text); }
+    .page-chip.selected {
+      background: var(--text);
+      border-color: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 11px 20px;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: opacity 0.1s, transform 0.1s var(--ease);
+      font-family: var(--font);
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+      pointer-events: none;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 80vw;
+    }
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #toast.success .toast-icon::before { content: "✓"; color: var(--success); }
+    #toast.error   .toast-icon::before { content: "✕"; color: var(--danger); }
+    #toast.info    .toast-icon::before { content: "↗"; color: var(--text-dim); }
+
+    /* ── Rotate picker ── */
+    .rotate-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .rotate-chip {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      background: var(--surface);
+      color: var(--text-dim);
+      transition: all 0.1s;
+    }
+    .rotate-chip:hover { border-color: #555; color: var(--text); }
+    .rotate-chip.selected {
+      background: var(--text);
+      border-color: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    /* ── Progress state ── */
+    .btn-primary.running {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Reveal link ── */
+    .reveal-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-dim);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      background: none;
+      border: none;
+    }
+    .reveal-link:hover { color: var(--text); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Title bar -->
+  <div id="titlebar">
+    <span class="wordmark">OhPDF</span>
+  </div>
+
+  <!-- Global drop overlay -->
+  <div id="drop-overlay">
+    <div class="drop-icon">📄</div>
+    <div class="drop-text">Drop files to get started</div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main">
+
+    <!-- Home screen -->
+    <div id="home">
+      <div class="label">What would you like to do?</div>
+      <div class="grid" id="tool-grid"></div>
+    </div>
+
+    <!-- Task view (shown when user picks a tool) -->
+    <div id="task-view">
+      <button class="back-btn" id="back-btn">
+        ← Back
+      </button>
+      <div class="task-title" id="task-title"></div>
+      <div class="task-desc" id="task-desc"></div>
+      <div id="task-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
+
+<script>
+/* ────────────────────────────────────────────────
+   OhPDF — UI Logic (vanilla JS, no build step)
+   ──────────────────────────────────────────────── */
+
+// ── Tool definitions ──────────────────────────
+const TOOLS = [
+  {
+    id: 'merge',
+    icon: '⊕',
+    name: 'Merge PDFs',
+    hint: 'Combine multiple files into one',
+    desc: 'Merge multiple PDF files into one, in the order they were added.',
+    multi: true,
+  },
+  {
+    id: 'split',
+    icon: '⊘',
+    name: 'Split PDF',
+    hint: 'Split by page ranges',
+    desc: 'Split a PDF into multiple files by page range.',
+    multi: false,
+  },
+  {
+    id: 'compress',
+    icon: '◉',
+    name: 'Compress PDF',
+    hint: 'Reduce file size',
+    desc: 'Optimize PDF size for easier sharing or storage.',
+    multi: false,
+  },
+  {
+    id: 'encrypt',
+    icon: '⊛',
+    name: 'Encrypt PDF',
+    hint: 'Set an open password',
+    desc: 'Add password protection so only those with the password can open the file.',
+    multi: false,
+  },
+  {
+    id: 'decrypt',
+    icon: '⊖',
+    name: 'Decrypt PDF',
+    hint: 'Remove existing password',
+    desc: 'Remove password protection from a PDF by entering the correct password.',
+    multi: false,
+  },
+  {
+    id: 'delete-pages',
+    icon: '⊟',
+    name: 'Delete Pages',
+    hint: 'Remove unwanted pages',
+    desc: 'Delete specific pages from a PDF.',
+    multi: false,
+    needsPagePick: true,
+  },
+  {
+    id: 'extract-pages',
+    icon: '⊞',
+    name: 'Extract Pages',
+    hint: 'Save selected pages as a new file',
+    desc: 'Extract selected pages into a new PDF file.',
+    multi: false,
+    needsPagePick: true,
+  },
+  {
+    id: 'rotate-pages',
+    icon: '↻',
+    name: 'Rotate Pages',
+    hint: 'Rotate specific pages',
+    desc: 'Choose pages to rotate and the rotation angle.',
+    multi: false,
+    needsPagePick: true,
+    needsRotate: true,
+  },
+  {
+    id: 'reorder-pages',
+    icon: '⇅',
+    name: 'Reorder Pages',
+    hint: 'Drag to rearrange page order',
+    desc: 'Drag and drop to rearrange the page order of a PDF.',
+    multi: false,
+    needsReorder: true,
+  },
+  {
+    id: 'pdf-to-images',
+    icon: '🖼',
+    name: 'PDF to Images',
+    hint: 'Export each page as a PNG',
+    desc: 'Render each PDF page as a PNG image, saved next to the source file.',
+    multi: false,
+  },
+  {
+    id: 'images-to-pdf',
+    icon: '📑',
+    name: 'Images to PDF',
+    hint: 'Combine images into a PDF',
+    desc: 'Combine multiple PNG / JPG images into a single PDF, one image per page.',
+    multi: true,
+    acceptImages: true,
+  },
+  {
+    id: 'watermark',
+    icon: '◈',
+    name: 'Add Watermark',
+    hint: 'Overlay text watermark on every page',
+    desc: 'Add a semi-transparent text watermark to every page, e.g. Confidential or Draft.',
+    multi: false,
+  },
+];
+
+// ── State ─────────────────────────────────────
+let currentTool = null;
+let files = [];        // File objects
+let pageCount = 0;
+let selectedPages = new Set();
+let reorderOrder = [];  // 1-indexed
+let splitRanges = [];
+
+// ── DOM refs ──────────────────────────────────
+const home       = document.getElementById('home');
+const taskView   = document.getElementById('task-view');
+const taskTitle  = document.getElementById('task-title');
+const taskDesc   = document.getElementById('task-desc');
+const taskBody   = document.getElementById('task-body');
+const backBtn    = document.getElementById('back-btn');
+const toolGrid   = document.getElementById('tool-grid');
+const dropOverlay = document.getElementById('drop-overlay');
+
+// ── Render home grid ──────────────────────────
+function renderHome() {
+  toolGrid.innerHTML = '';
+  TOOLS.forEach(tool => {
+    const card = document.createElement('div');
+    card.className = 'tool-card';
+    card.innerHTML = `
+      <div class="icon">${tool.icon}</div>
+      <div class="name">${tool.name}</div>
+      <div class="hint">${tool.hint}</div>
+    `;
+    card.addEventListener('click', () => openTool(tool.id));
+    toolGrid.appendChild(card);
+  });
+}
+renderHome();
+
+// ── Navigation ────────────────────────────────
+function openTool(id, droppedFiles) {
+  currentTool = TOOLS.find(t => t.id === id);
+  if (!currentTool) return;
+
+  files = droppedFiles ? Array.from(droppedFiles) : [];
+  selectedPages = new Set();
+  reorderOrder = [];
+  splitRanges = [];
+  pageCount = 0;
+
+  home.classList.add('hidden');
+  taskView.classList.add('active');
+  taskTitle.textContent = currentTool.name;
+  taskDesc.textContent  = currentTool.desc;
+
+  renderTask();
+}
+
+backBtn.addEventListener('click', goHome);
+
+function goHome() {
+  currentTool = null;
+  files = [];
+  home.classList.remove('hidden');
+  taskView.classList.remove('active');
+  taskBody.innerHTML = '';
+}
+
+// ── Task renderer ─────────────────────────────
+function renderTask() {
+  taskBody.innerHTML = '';
+
+  // File drop zone
+  if (currentTool.multi || files.length === 0) {
+    taskBody.appendChild(makeDropZone());
+  }
+
+  // File list
+  const fileListEl = document.createElement('div');
+  fileListEl.className = 'file-list';
+  fileListEl.id = 'file-list';
+  taskBody.appendChild(fileListEl);
+  renderFileList();
+
+  // Tool-specific controls
+  if (currentTool.id === 'compress') {
+    taskBody.appendChild(makeCompressControls());
+  }
+  if (currentTool.id === 'encrypt') {
+    taskBody.appendChild(makePasswordField('encrypt-pwd', 'Set password'));
+  }
+  if (currentTool.id === 'decrypt') {
+    taskBody.appendChild(makePasswordField('decrypt-pwd', 'Enter existing password'));
+  }
+  if (currentTool.id === 'split') {
+    taskBody.appendChild(makeSplitControls());
+  }
+  if (currentTool.needsPagePick) {
+    taskBody.appendChild(makePagePicker());
+  }
+  if (currentTool.needsRotate) {
+    taskBody.appendChild(makeRotatePicker());
+  }
+  if (currentTool.needsReorder) {
+    taskBody.appendChild(makeReorderList());
+  }
+  if (currentTool.id === 'pdf-to-images') {
+    taskBody.appendChild(makeDpiControls());
+  }
+  if (currentTool.id === 'watermark') {
+    taskBody.appendChild(makeWatermarkControls());
+  }
+
+  // Execute button
+  const runBtn = document.createElement('button');
+  runBtn.className = 'btn-primary';
+  runBtn.id = 'run-btn';
+  runBtn.textContent = 'Run';
+  runBtn.addEventListener('click', execute);
+  taskBody.appendChild(runBtn);
+}
+
+// ── Drop zone ─────────────────────────────────
+function makeDropZone() {
+  const zone = document.createElement('div');
+  zone.className = 'drop-zone';
+  const isImg = !!currentTool.acceptImages;
+  const hint = currentTool.multi
+    ? (isImg ? 'Click to select images' : 'Click to select PDF files')
+    : 'Click to select a PDF file';
+  const subhint = isImg
+    ? 'Supports PNG / JPG / WebP — processed locally'
+    : 'Files are processed locally — nothing is uploaded to any server';
+  zone.innerHTML = `
+    <div class="dz-icon">${isImg ? '🖼' : '📄'}</div>
+    <div class="dz-text">${hint}</div>
+    <div class="dz-hint">${subhint}</div>
+  `;
+
+  // Click to pick file(s) via the native OS file dialog.
+  //
+  // NOTE: we intentionally do NOT use `<input type="file">` here. A browser
+  // `File` object never exposes a real filesystem path (WebView2 / WKWebView
+  // / WebKitGTK all withhold it for security reasons), so the old code's
+  // `files[0].path` was always `undefined` and every operation below either
+  // silently no-op'd (page count never fetched) or got sent a bare filename
+  // with no directory. Going through Rust's native dialog (`rfd`) gives us
+  // a real absolute path every time.
+  zone.addEventListener('click', () => pickFilesNative());
+
+  // Drag-and-drop from the OS cannot reliably yield real paths in a
+  // generic webview either, so a drop just opens the same native dialog
+  // as a graceful fallback rather than trusting `dataTransfer.files`.
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    pickFilesNative();
+  });
+
+  return zone;
+}
+
+function pickFilesNative() {
+  const isImg = !!currentTool.acceptImages;
+  sendIpc({
+    action: 'pick_files',
+    kind: isImg ? 'image' : 'pdf',
+    multiple: !!currentTool.multi,
+  }).then(res => {
+    if (res.status === 'paths' && res.paths && res.paths.length) {
+      const picked = res.paths.map(p => ({
+        path: p,
+        name: p.split(/[\\/]/).pop(),
+      }));
+      addFiles(picked);
+    }
+  }).catch(err => toast('error', String(err)));
+}
+
+function addFiles(newFiles) {
+  if (!currentTool.multi) {
+    files = newFiles.slice(0, 1);
+  } else {
+    files = [...files, ...newFiles];
+  }
+  renderFileList();
+  afterFilesChange();
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  if (!el) return;
+  el.innerHTML = '';
+  files.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    const isReorder = currentTool.needsReorder;
+    item.innerHTML = `
+      ${isReorder ? '<span class="fi-drag" title="Drag to reorder">⠿</span>' : ''}
+      <span class="fi-icon">📄</span>
+      <span class="fi-name" title="${f.path || f.name}">${f.name}</span>
+      <button class="fi-remove" data-idx="${i}" title="Remove">✕</button>
+    `;
+    item.querySelector('.fi-remove').addEventListener('click', e => {
+      const idx = parseInt(e.currentTarget.dataset.idx, 10);
+      files.splice(idx, 1);
+      renderFileList();
+      afterFilesChange();
+    });
+    el.appendChild(item);
+  });
+}
+
+function afterFilesChange() {
+  if (files.length === 0 || !files[0].path) return;
+
+  if (currentTool.needsPagePick || currentTool.needsReorder) {
+    // Ask Rust for page count
+    sendIpc({ action: 'get_page_count', path: files[0].path })
+      .then(res => {
+        if (res.status === 'page_count') {
+          pageCount = res.count;
+          if (currentTool.needsPagePick) renderPageChips();
+          if (currentTool.needsReorder)  renderReorderItems();
+        }
+      });
+  }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Compress controls ─────────────────────────
+function makeCompressControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label">Image Quality</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="quality-slider" min="10" max="100" value="75" step="5" />
+      <span class="range-val" id="quality-val">75</span>
+    </div>
+  `;
+  wrap.querySelector('#quality-slider').addEventListener('input', e => {
+    wrap.querySelector('#quality-val').textContent = e.target.value;
+  });
+  return wrap;
+}
+
+// ── Password field ────────────────────────────
+function makePasswordField(id, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label" for="${id}">${label}</label>
+    <input class="field-input" type="password" id="${id}" placeholder="••••••••" autocomplete="off" />
+  `;
+  return wrap;
+}
+
+// ── Split controls ────────────────────────────
+let splitRangeCount = 1;
+
+function makeSplitControls() {
+  const wrap = document.createElement('div');
+  wrap.id = 'split-wrap';
+  wrap.className = 'field-group';
+  wrap.innerHTML = '<label class="field-label">Split Ranges (page numbers, starting at 1)</label>';
+  renderSplitRows(wrap);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-primary';
+  addBtn.style.cssText = 'background:var(--surface);color:var(--text);border:1px solid var(--border);margin-top:6px;';
+  addBtn.textContent = '+ Add Range';
+  addBtn.addEventListener('click', () => {
+    splitRangeCount++;
+    renderSplitRows(wrap);
+  });
+  wrap.appendChild(addBtn);
+  return wrap;
+}
+
+function renderSplitRows(wrap) {
+  const existing = wrap.querySelectorAll('.split-row');
+  existing.forEach(el => el.remove());
+
+  for (let i = 0; i < splitRangeCount; i++) {
+    const row = document.createElement('div');
+    row.className = 'split-row range-row';
+    row.style.marginBottom = '6px';
+    row.innerHTML = `
+      <input class="field-input" type="number" placeholder="Start page" min="1" style="width:50%" id="split-start-${i}" />
+      <span style="color:var(--text-dim);padding:0 4px;">—</span>
+      <input class="field-input" type="number" placeholder="End page" min="1" style="width:50%" id="split-end-${i}" />
+    `;
+    wrap.appendChild(row);
+  }
+}
+
+// ── Page picker ───────────────────────────────
+function makePagePicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'page-picker-wrap';
+  wrap.innerHTML = `<label class="field-label">Select Pages (shown after file loads)</label>
+    <div class="page-grid" id="page-grid"></div>`;
+  return wrap;
+}
+
+function renderPageChips() {
+  const grid = document.getElementById('page-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  selectedPages.clear();
+
+  for (let i = 1; i <= pageCount; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'page-chip';
+    chip.textContent = i;
+    chip.dataset.page = i;
+    chip.addEventListener('click', () => {
+      const p = parseInt(chip.dataset.page, 10);
+      if (selectedPages.has(p)) {
+        selectedPages.delete(p);
+        chip.classList.remove('selected');
+      } else {
+        selectedPages.add(p);
+        chip.classList.add('selected');
+      }
+    });
+    grid.appendChild(chip);
+  }
+}
+
+// ── Rotate picker ─────────────────────────────
+function makeRotatePicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'rotate-picker-wrap';
+  wrap.innerHTML = `<label class="field-label">Rotation</label>
+    <div class="rotate-options">
+      <div class="rotate-chip selected" data-deg="90">90° Clockwise</div>
+      <div class="rotate-chip" data-deg="180">180°</div>
+      <div class="rotate-chip" data-deg="270">90° Counter-clockwise</div>
+    </div>`;
+  wrap.querySelectorAll('.rotate-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      wrap.querySelectorAll('.rotate-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+  return wrap;
+}
+
+function getSelectedDegrees() {
+  const chip = taskBody.querySelector('.rotate-chip.selected');
+  return chip ? parseInt(chip.dataset.deg, 10) : 90;
+}
+
+// ── Reorder list ──────────────────────────────
+function makeReorderList() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'reorder-wrap';
+  wrap.innerHTML = `<label class="field-label">Drag to Reorder Pages (shown after file loads)</label>
+    <div class="file-list" id="reorder-list"></div>`;
+  return wrap;
+}
+
+function renderReorderItems() {
+  const list = document.getElementById('reorder-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Initialize order if needed
+  if (reorderOrder.length !== pageCount) {
+    reorderOrder = Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
+
+  reorderOrder.forEach((pageNum, listIdx) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.draggable = true;
+    item.dataset.listIdx = listIdx;
+    item.innerHTML = `
+      <span class="fi-drag">⠿</span>
+      <span class="fi-icon">📄</span>
+      <span class="fi-name">Page ${pageNum}</span>
+    `;
+    // Drag-and-drop reorder
+    item.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', listIdx);
+      item.classList.add('dragging');
+    });
+    item.addEventListener('dragend', () => item.classList.remove('dragging'));
+    item.addEventListener('dragover', e => { e.preventDefault(); });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const to   = parseInt(item.dataset.listIdx, 10);
+      if (from !== to) {
+        const moved = reorderOrder.splice(from, 1)[0];
+        reorderOrder.splice(to, 0, moved);
+        renderReorderItems();
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+// ── DPI controls (PDF to images) ──────────────
+function makeDpiControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label">Output Resolution (DPI)</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="dpi-slider" min="72" max="300" value="150" step="6" />
+      <span class="range-val" id="dpi-val">150</span>
+    </div>
+    <div class="field-label" style="margin-top:4px;font-size:11px;color:#555">
+      72 = Screen preview &nbsp;·&nbsp; 150 = Standard print &nbsp;·&nbsp; 300 = High-res print
+    </div>
+  `;
+  wrap.querySelector('#dpi-slider').addEventListener('input', e => {
+    wrap.querySelector('#dpi-val').textContent = e.target.value;
+  });
+  return wrap;
+}
+
+// ── Watermark controls ─────────────────────────
+function makeWatermarkControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label" for="wm-text">Watermark Text</label>
+    <input class="field-input" type="text" id="wm-text" placeholder="e.g. Confidential / Draft / DO NOT COPY" maxlength="40" />
+
+    <label class="field-label" style="margin-top:12px">Font Size</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="wm-size" min="20" max="120" value="60" step="4" />
+      <span class="range-val" id="wm-size-val">60</span>
+    </div>
+
+    <label class="field-label" style="margin-top:12px">Opacity</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="wm-opacity" min="5" max="60" value="15" step="1" />
+      <span class="range-val" id="wm-opacity-val">15%</span>
+    </div>
+
+    <label class="field-label" style="margin-top:12px">Rotation</label>
+    <div class="rotate-options" id="wm-rotation-opts">
+      <div class="rotate-chip" data-deg="0">Horizontal</div>
+      <div class="rotate-chip selected" data-deg="45">45°</div>
+      <div class="rotate-chip" data-deg="90">Vertical</div>
+    </div>
+  `;
+
+  wrap.querySelector('#wm-size').addEventListener('input', e => {
+    wrap.querySelector('#wm-size-val').textContent = e.target.value;
+  });
+  wrap.querySelector('#wm-opacity').addEventListener('input', e => {
+    wrap.querySelector('#wm-opacity-val').textContent = e.target.value + '%';
+  });
+  wrap.querySelectorAll('#wm-rotation-opts .rotate-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      wrap.querySelectorAll('#wm-rotation-opts .rotate-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+
+  return wrap;
+}
+
+
+// ── IPC ───────────────────────────────────────
+// Pending requests keyed by id, so that responses (delivered once, globally,
+// via window.__ipc_cb) get routed back to the right Promise even if two
+// calls happen to overlap. The callback is installed once, not per-call.
+const pendingIpc = new Map();
+window.__ipc_cb = (data) => {
+  const { id, ...rest } = data || {};
+  const entry = pendingIpc.get(id);
+  if (entry) {
+    pendingIpc.delete(id);
+    entry.resolve(rest);
+  }
+};
+
+function sendIpc(msg) {
+  return new Promise((resolve, reject) => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    pendingIpc.set(id, { resolve, reject });
+    const payload = { id, ...msg };
+    try {
+      window.ipc.postMessage(JSON.stringify(payload));
+    } catch (e) {
+      // Dev mode fallback (browser preview, no wry ipc bridge present)
+      console.log('[IPC send]', payload);
+      pendingIpc.delete(id);
+      setTimeout(() => resolve({ status: 'ok', output: '/tmp/output.pdf', message: '(Simulated success)' }), 600);
+    }
+  });
+}
+
+// ── Execute ───────────────────────────────────
+async function execute() {
+  if (!validateInput()) return;
+
+  const runBtn = document.getElementById('run-btn');
+  runBtn.classList.add('running');
+  runBtn.innerHTML = '<span class="spinner"></span> Processing…';
+
+  try {
+    const result = await buildAndSend();
+    runBtn.classList.remove('running');
+
+    if (result.status === 'ok') {
+      toast('success', result.message || 'Done!', result.output);
+      runBtn.textContent = '✓ Done';
+    } else {
+      toast('error', result.message || 'Operation failed.');
+      runBtn.textContent = 'Run';
+    }
+  } catch (err) {
+    runBtn.classList.remove('running');
+    runBtn.textContent = 'Run';
+    toast('error', String(err));
+  }
+}
+
+function validateInput() {
+  if (files.length === 0) {
+    toast('error', 'Please select a PDF file first.');
+    return false;
+  }
+  if (currentTool.id === 'merge' && files.length < 2) {
+    toast('error', 'Merge requires at least 2 files.');
+    return false;
+  }
+  if (currentTool.needsPagePick && selectedPages.size === 0) {
+    toast('error', 'Please select at least one page.');
+    return false;
+  }
+  return true;
+}
+
+async function buildAndSend() {
+  const path  = files[0]?.path || files[0]?.name;
+  const paths = files.map(f => f.path || f.name);
+
+  switch (currentTool.id) {
+    case 'merge':
+      return sendIpc({ action: 'merge', paths });
+
+    case 'split': {
+      const ranges = [];
+      for (let i = 0; i < splitRangeCount; i++) {
+        const s = parseInt(document.getElementById(`split-start-${i}`)?.value, 10);
+        const e = parseInt(document.getElementById(`split-end-${i}`)?.value, 10);
+        if (!isNaN(s) && !isNaN(e)) ranges.push({ start: s, end: e });
+      }
+      if (ranges.length === 0) {
+        toast('error', 'Please add at least one split range.');
+        return { status: 'error' };
+      }
+      return sendIpc({ action: 'split', path, ranges });
+    }
+
+    case 'compress': {
+      const q = parseInt(document.getElementById('quality-slider')?.value || '75', 10);
+      return sendIpc({ action: 'compress', path, quality: q });
+    }
+
+    case 'encrypt': {
+      const pwd = document.getElementById('encrypt-pwd')?.value;
+      if (!pwd) { toast('error', 'Please enter a password.'); return { status: 'error' }; }
+      return sendIpc({ action: 'encrypt', path, password: pwd });
+    }
+
+    case 'decrypt': {
+      const pwd = document.getElementById('decrypt-pwd')?.value;
+      if (!pwd) { toast('error', 'Please enter the existing password.'); return { status: 'error' }; }
+      return sendIpc({ action: 'decrypt', path, password: pwd });
+    }
+
+    case 'delete-pages':
+      return sendIpc({ action: 'delete_pages', path, pages: [...selectedPages] });
+
+    case 'extract-pages':
+      return sendIpc({ action: 'extract_pages', path, pages: [...selectedPages] });
+
+    case 'rotate-pages':
+      return sendIpc({ action: 'rotate_pages', path, pages: [...selectedPages], degrees: getSelectedDegrees() });
+
+    case 'reorder-pages':
+      return sendIpc({ action: 'reorder_pages', path, order: reorderOrder });
+
+    case 'pdf-to-images': {
+      const dpi = parseInt(document.getElementById('dpi-slider')?.value || '150', 10);
+      return sendIpc({ action: 'pdf_to_images', path, dpi });
+    }
+
+    case 'images-to-pdf': {
+      const firstName = files[0]?.name || 'images';
+      const stem = firstName.replace(/\.[^.]+$/, '');
+      return sendIpc({ action: 'images_to_pdf', paths, output_name: `${stem}_combined.pdf` });
+    }
+
+    case 'watermark': {
+      const text = document.getElementById('wm-text')?.value?.trim();
+      if (!text) { toast('error', 'Please enter watermark text.'); return { status: 'error' }; }
+      const fontSize = parseFloat(document.getElementById('wm-size')?.value || '60');
+      const opacityPct = parseFloat(document.getElementById('wm-opacity')?.value || '15');
+      const rotChip = taskBody.querySelector('#wm-rotation-opts .rotate-chip.selected');
+      const rotation = rotChip ? parseFloat(rotChip.dataset.deg) : 45;
+      return sendIpc({
+        action: 'add_watermark',
+        path,
+        text,
+        font_size: fontSize,
+        opacity: opacityPct / 100,
+        rotation,
+      });
+    }
+
+    default:
+      return { status: 'error', message: 'Unknown tool.' };
+  }
+}
+
+// ── Toast ─────────────────────────────────────
+let toastTimer;
+function toast(type, message, outputPath) {
+  const el  = document.getElementById('toast');
+  const msg = document.getElementById('toast-msg');
+
+  el.className = `${type}`;
+  if (outputPath) {
+    msg.innerHTML = `${message} <button class="reveal-link" onclick="revealFile('${outputPath}')">Show in Folder ↗</button>`;
+  } else {
+    msg.textContent = message;
+  }
+
+  el.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), 4000);
+}
+
+function revealFile(path) {
+  sendIpc({ action: 'reveal_in_finder', path });
+}
+
+// ── Global drag-and-drop ──────────────────────
+document.addEventListener('dragenter', e => {
+  if (e.dataTransfer.types.includes('Files')) {
+    dropOverlay.classList.add('active');
+  }
+});
+document.addEventListener('dragleave', e => {
+  if (!e.relatedTarget) dropOverlay.classList.remove('active');
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dropOverlay.classList.remove('active');
+
+  const allFiles = Array.from(e.dataTransfer.files);
+  const pdfs   = allFiles.filter(f => f.name.endsWith('.pdf'));
+  const images = allFiles.filter(f => f.type.startsWith('image/'));
+
+  if (currentTool) {
+    // In a task — add to current file list
+    addFiles(currentTool.acceptImages ? images : pdfs);
+    return;
+  }
+
+  // On home screen
+  if (images.length > 0 && pdfs.length === 0) {
+    openTool('images-to-pdf', images);
+  } else if (pdfs.length > 1) {
+    openTool('merge', pdfs);
+  } else if (pdfs.length === 1) {
+    openTool('merge', pdfs);
+  }
+});
+</script>
+</body>
+</html>
