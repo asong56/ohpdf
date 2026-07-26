@@ -1,16 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-
-use wry::WebView;
+use std::sync::mpsc::Sender;
 
 use crate::pdf;
 
-/// Every message from JS is wrapped with a client-generated `id` so that
-/// responses can be matched to the right pending Promise on the JS side,
-/// even if two IPC calls happen to overlap. `#[serde(flatten)]` merges the
-/// rest of the JSON object's keys into `request` based on its own `action`
-/// tag.
 #[derive(Debug, Deserialize)]
 struct Envelope {
     id: String,
@@ -25,7 +18,6 @@ struct ResponseEnvelope<'a> {
     response: IpcResponse,
 }
 
-/// Messages sent from the UI (JS) to Rust.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum IpcRequest {
@@ -86,11 +78,7 @@ pub enum IpcRequest {
     RevealInFinder {
         path: String,
     },
-    /// Opens a native OS file picker and returns the chosen absolute paths.
-    /// This replaces relying on the browser `File.path` property, which no
-    /// webview actually exposes.
     PickFiles {
-        /// "pdf" or "image"
         kind: String,
         multiple: bool,
     },
@@ -102,7 +90,6 @@ pub struct PageRange {
     pub end: u32,
 }
 
-/// Responses sent from Rust back to the UI.
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum IpcResponse {
@@ -121,14 +108,8 @@ pub enum IpcResponse {
     },
 }
 
-/// Builds the IPC handler wry calls for every `window.ipc.postMessage(...)`
-/// from the page. `webview` is filled in by `main.rs` right after the
-/// webview is constructed; the handler uses it to call `evaluate_script`
-/// with the JSON response, which is how the earlier version's responses
-/// were supposed to reach the frontend but never actually did (it only
-/// logged them).
 pub fn make_handler(
-    webview: Arc<Mutex<Option<WebView>>>,
+    tx: Sender<String>,
 ) -> impl Fn(wry::http::Request<String>) + Send + Sync + 'static {
     move |req: wry::http::Request<String>| {
         let body = req.body();
@@ -160,17 +141,8 @@ pub fn make_handler(
 
         let script = format!("window.__ipc_cb && window.__ipc_cb({});", json);
 
-        match webview.lock() {
-            Ok(guard) => {
-                if let Some(wv) = guard.as_ref() {
-                    if let Err(e) = wv.evaluate_script(&script) {
-                        log::error!("Failed to deliver IPC response to webview: {}", e);
-                    }
-                } else {
-                    log::error!("IPC response dropped: webview not yet initialised");
-                }
-            }
-            Err(e) => log::error!("Webview lock poisoned: {}", e),
+        if let Err(e) = tx.send(script) {
+            log::error!("Failed to queue IPC response (event loop gone?): {}", e);
         }
     }
 }
@@ -426,7 +398,6 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
     }
 }
 
-/// Build output path: same directory, stem + suffix + ".pdf"
 fn derive_output(src: &PathBuf, suffix: &str) -> PathBuf {
     let parent = src.parent().unwrap_or_else(|| std::path::Path::new("."));
     let stem = src
@@ -451,7 +422,6 @@ fn reveal_in_finder(path: &str) {
     }
     #[cfg(target_os = "linux")]
     {
-        // Best-effort: open the parent directory
         if let Some(parent) = std::path::Path::new(path).parent() {
             let _ = std::process::Command::new("xdg-open")
                 .arg(parent)
