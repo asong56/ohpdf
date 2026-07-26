@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 
 use tao::{
     dpi::LogicalSize,
@@ -6,7 +6,7 @@ use tao::{
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
-use wry::{WebView, WebViewBuilder};
+use wry::WebViewBuilder;
 
 mod ipc;
 mod pdf;
@@ -24,25 +24,24 @@ fn main() -> anyhow::Result<()> {
 
     let html = include_str!("../ui/index.html");
 
-    // The ipc handler needs to be able to call `evaluate_script` on the
-    // webview once a response is ready, but `WebViewBuilder::with_ipc_handler`
-    // requires the handler *before* the webview itself exists. We solve the
-    // chicken-and-egg problem with a shared slot that gets filled in right
-    // after `build()` returns, before the event loop starts running (so
-    // there's no window where a message could arrive with the slot empty).
-    let webview_slot: Arc<Mutex<Option<WebView>>> = Arc::new(Mutex::new(None));
-    let handler = ipc::make_handler(webview_slot.clone());
+    let (tx, rx) = mpsc::channel::<String>();
+    let handler = ipc::make_handler(tx);
 
-    let webview = WebViewBuilder::new(&window)
+    let webview = WebViewBuilder::new()
         .with_html(html)
         .with_ipc_handler(handler)
         .with_devtools(cfg!(debug_assertions))
-        .build()?;
-
-    *webview_slot.lock().unwrap() = Some(webview);
+        .build(&window)?;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
+
+        while let Ok(script) = rx.try_recv() {
+            if let Err(e) = webview.evaluate_script(&script) {
+                log::error!("Failed to deliver IPC response to webview: {}", e);
+            }
+        }
+
         if let Event::WindowEvent {
             event: WindowEvent::CloseRequested,
             ..
