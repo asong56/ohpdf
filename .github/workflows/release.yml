@@ -55,14 +55,23 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
-      - name: Package into ZIP
+      - name: Package into ZIP (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p dist
           cp "target/release/${{ matrix.platform.artifact_name }}" dist/
-          
+
           cd dist
           zip -r "../${{ matrix.platform.asset_name }}.zip" .
+
+      - name: Package into ZIP (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target/release/${{ matrix.platform.artifact_name }}" dist/
+          Compress-Archive -Path dist/* -DestinationPath "${{ matrix.platform.asset_name }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
