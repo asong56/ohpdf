@@ -3,7 +3,6 @@ use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 use std::collections::HashSet;
 
-/// Get total page count of a PDF.
 pub fn page_count(input: &Path) -> Result<u32> {
     let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
@@ -11,7 +10,6 @@ pub fn page_count(input: &Path) -> Result<u32> {
     Ok(count)
 }
 
-/// Delete specific pages (1-indexed) from a PDF.
 pub fn delete_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     anyhow::ensure!(!pages.is_empty(), "At least one page must be specified.");
 
@@ -59,7 +57,6 @@ pub fn delete_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     Ok(())
 }
 
-/// Extract specific pages (1-indexed) into a new PDF.
 pub fn extract_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     anyhow::ensure!(!pages.is_empty(), "At least one page must be specified.");
 
@@ -104,12 +101,6 @@ pub fn extract_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     Ok(())
 }
 
-/// Rotate specific pages (1-indexed) by `degrees` (must be +/-90, 180 or 270).
-///
-/// mupdf-rs has no `Document::rotate_page` method (it never existed). Page
-/// rotation in a PDF is just the integer `/Rotate` key on the page
-/// dictionary, so we read/write it directly via `find_page` + `dict_put`,
-/// which are real, documented `PdfDocument`/`PdfObject` methods.
 pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) -> Result<()> {
     anyhow::ensure!(
         matches!(degrees, 90 | 180 | 270 | -90 | -180 | -270),
@@ -136,7 +127,7 @@ pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) ->
     for i in 0..total {
         let page_no = i + 1;
         if to_rotate.contains(&page_no) {
-            let page_obj = doc
+            let mut page_obj = doc
                 .find_page(i as i32)
                 .with_context(|| format!("Failed to read page {}.", page_no))?;
 
@@ -170,9 +161,6 @@ pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) ->
     Ok(())
 }
 
-/// Reorder pages. `order` is a 1-indexed slice that maps new positions
-/// to old page numbers. For example, `[3, 1, 2]` puts old page 3 first,
-/// then 1, then 2.
 pub fn reorder_pages(input: &Path, output: &Path, order: &[u32]) -> Result<()> {
     anyhow::ensure!(!order.is_empty(), "Page order cannot be empty.");
 
