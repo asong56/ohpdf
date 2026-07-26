@@ -42,20 +42,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libmupdf-dev \
             libwebkit2gtk-4.1-dev \
             build-essential \
+            clang \
             pkg-config
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install mupdf pkg-config
-
-      - name: Install Windows dependencies (vcpkg)
-        if: runner.os == 'Windows'
-        run: |
-          vcpkg install mupdf:x64-windows-static
+          xcode-select --install || true
 
       - name: Build release binary
         run: cargo build --release
