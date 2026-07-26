@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
-use mupdf::{Colorspace, Document, Image, ImageFormat, Matrix, Rect, Size};
+use mupdf::{
+    Colorspace, Document, Image, ImageFormat, InsertImageOptions, Matrix, PageImageSource, Rect,
+    Size,
+};
 
 pub fn pdf_to_images(input: &Path, dpi: u32) -> Result<Vec<PathBuf>> {
     let src = Document::open(input.to_str().context("Path contains invalid characters.")?)
@@ -42,8 +45,6 @@ pub fn pdf_to_images(input: &Path, dpi: u32) -> Result<Vec<PathBuf>> {
     Ok(outputs)
 }
 
-/// Combine image files (PNG / JPG / JPEG / WEBP / BMP) into a single PDF.
-/// Each image becomes one page, sized to fit the image at 72 dpi.
 pub fn images_to_pdf(images: &[PathBuf], output: &Path) -> Result<()> {
     anyhow::ensure!(!images.is_empty(), "At least one image is required.");
 
@@ -72,8 +73,13 @@ pub fn images_to_pdf(images: &[PathBuf], output: &Path) -> Result<()> {
             .new_page(Size { width: w, height: h })
             .with_context(|| format!("Failed to create page for: {}", img_path.display()))?;
 
-        page.insert_image(&Rect::new(0.0, 0.0, w, h), &image)
-            .with_context(|| format!("Failed to insert image: {}", img_path.display()))?;
+        page.insert_image(
+            &mut doc,
+            Rect::new(0.0, 0.0, w, h),
+            PageImageSource::Image(&image),
+            InsertImageOptions::default(),
+        )
+        .with_context(|| format!("Failed to insert image: {}", img_path.display()))?;
     }
 
     doc.save(output.to_str().context("Output path contains invalid characters.")?)
