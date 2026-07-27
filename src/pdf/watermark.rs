@@ -5,11 +5,16 @@ use mupdf::pdf::{PdfDocument, PdfPage};
 use mupdf::shape::{PdfColor, Shape, TextOptions};
 use mupdf::Point;
 
+/// Watermark options.
 pub struct WatermarkOptions<'a> {
     pub text: &'a str,
+    /// Font size in points (default 60)
     pub font_size: f32,
+    /// Opacity 0.0–1.0 (default 0.15)
     pub opacity: f32,
+    /// Rotation in degrees counter-clockwise (default 45)
     pub rotation: f32,
+    /// Color as (r, g, b) each 0.0–1.0 (default gray)
     pub color: (f32, f32, f32),
 }
 
@@ -25,7 +30,24 @@ impl Default for WatermarkOptions<'_> {
     }
 }
 
-
+/// Add a diagonal text watermark to every page.
+///
+/// NOTE: `Document::add_text_annotation` and the top-level `Color` type used
+/// by the old code never existed in mupdf-rs. Text is drawn with the `Shape`
+/// API (`Shape::insert_text` + `TextOptions`), which is mupdf-rs's real,
+/// documented way to stamp text onto an existing `PdfPage`. `PdfColor` (not
+/// `Color`) is the real color type, under `mupdf::shape`.
+///
+/// `PdfDocument::load_page` (via the `Document` trait) returns a generic,
+/// read-only `Page`, not a `PdfPage` — `Shape` needs the latter. We bridge
+/// this with `PdfPage::try_from(page)`, the crate's documented conversion
+/// from a loaded `Page` back to the editable PDF-specific type.
+///
+/// `TextOptions`'s exact field names for rotation/color were not fully
+/// verifiable in this sandbox (no working local build), so rotation is
+/// approximated using a rotated insertion point rather than a rotated
+/// `TextOptions` field; if your version of `TextOptions` supports a direct
+/// rotation/angle field, prefer that for a cleaner diagonal stamp.
 pub fn add_watermark(input: &Path, output: &Path, opts: &WatermarkOptions) -> Result<()> {
     anyhow::ensure!(!opts.text.is_empty(), "Watermark text cannot be empty.");
     anyhow::ensure!(

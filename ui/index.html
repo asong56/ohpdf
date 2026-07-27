@@ -245,6 +245,30 @@
     }
     .file-item.dragging { opacity: 0.4; }
 
+    /* Small inline thumbnail used in the reorder list rows. */
+    .fi-thumb-wrap {
+      width: 32px;
+      height: 40px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .fi-thumb-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .fi-thumb-wrap.pc-loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #222 37%, #1a1a1a 63%);
+      background-size: 400% 100%;
+      animation: pc-shimmer 1.4s ease infinite;
+    }
+
     /* ── Controls ── */
     .field-group {
       display: flex;
@@ -294,22 +318,49 @@
     .page-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
       margin-top: 6px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 2px;
     }
     .page-chip {
-      width: 36px;
-      height: 36px;
+      width: 84px;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+      gap: 4px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      font-size: 12px;
+      padding: 5px;
       cursor: pointer;
       transition: background 0.1s, border-color 0.1s, color 0.1s;
       background: var(--surface);
       color: var(--text-dim);
+    }
+    .page-chip .pc-thumb-wrap {
+      width: 100%;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .page-chip .pc-thumb {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      /* Real page previews, not stretched to fill — keeps them readable
+         without ballooning to full size. */
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .page-chip .pc-num {
+      font-size: 11px;
+      line-height: 1;
+      padding-top: 1px;
     }
     .page-chip:hover { border-color: #555; color: var(--text); }
     .page-chip.selected {
@@ -317,6 +368,17 @@
       border-color: var(--text);
       color: var(--bg);
       font-weight: 600;
+    }
+    .page-chip.selected .pc-thumb-wrap { box-shadow: 0 0 0 2px var(--bg) inset; }
+    /* Skeleton shown while a thumbnail is still rendering. */
+    .pc-thumb-wrap.pc-loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #222 37%, #1a1a1a 63%);
+      background-size: 400% 100%;
+      animation: pc-shimmer 1.4s ease infinite;
+    }
+    @keyframes pc-shimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0 50%; }
     }
 
     /* ── Primary button ── */
@@ -586,6 +648,10 @@ const TOOLS = [
 let currentTool = null;
 let files = [];        // File objects
 let pageCount = 0;
+// Map<pageNumber, dataUrl> — populated once thumbnails come back from Rust,
+// and read by both renderPageChips() and renderReorderItems() so a single
+// render pass is shared between the delete-pages and reorder-pages pickers.
+let pageThumbnails = new Map();
 let selectedPages = new Set();
 let reorderOrder = [];  // 1-indexed
 let splitRanges = [];
@@ -627,6 +693,7 @@ function openTool(id, droppedFiles) {
   reorderOrder = [];
   splitRanges = [];
   pageCount = 0;
+  pageThumbnails = new Map();
 
   home.classList.add('hidden');
   taskView.classList.add('active');
@@ -800,14 +867,25 @@ function afterFilesChange() {
   if (files.length === 0 || !files[0].path) return;
 
   if (currentTool.needsPagePick || currentTool.needsReorder) {
-    // Ask Rust for page count
-    sendIpc({ action: 'get_page_count', path: files[0].path })
+    const path = files[0].path;
+    // Ask Rust for page count first so the grid/list can render immediately
+    // (with loading-skeleton thumbnails), rather than waiting on rendering
+    // to finish before showing anything.
+    sendIpc({ action: 'get_page_count', path })
       .then(res => {
-        if (res.status === 'page_count') {
-          pageCount = res.count;
-          if (currentTool.needsPagePick) renderPageChips();
-          if (currentTool.needsReorder)  renderReorderItems();
-        }
+        if (res.status !== 'page_count') return;
+        pageCount = res.count;
+        if (currentTool.needsPagePick) renderPageChips();
+        if (currentTool.needsReorder)  renderReorderItems();
+
+        // Now fetch the actual page previews and swap them in once ready.
+        return sendIpc({ action: 'get_page_thumbnails', path });
+      })
+      .then(res => {
+        if (!res || res.status !== 'thumbnails') return;
+        pageThumbnails = new Map(res.pages.map(p => [p.page, p.data_url]));
+        if (currentTool.needsPagePick) renderPageChips();
+        if (currentTool.needsReorder)  renderReorderItems();
       });
   }
 }
@@ -899,13 +977,29 @@ function renderPageChips() {
   const grid = document.getElementById('page-grid');
   if (!grid) return;
   grid.innerHTML = '';
-  selectedPages.clear();
+  // Keep prior selections across re-renders (e.g. when thumbnails arrive
+  // after the initial skeleton render) instead of wiping them out.
+  const keepSelected = new Set(selectedPages);
+  selectedPages = new Set();
 
   for (let i = 1; i <= pageCount; i++) {
     const chip = document.createElement('div');
     chip.className = 'page-chip';
-    chip.textContent = i;
     chip.dataset.page = i;
+
+    const dataUrl = pageThumbnails.get(i);
+    chip.innerHTML = `
+      <div class="pc-thumb-wrap${dataUrl ? '' : ' pc-loading'}">
+        ${dataUrl ? `<img class="pc-thumb" src="${dataUrl}" alt="Page ${i}" />` : ''}
+      </div>
+      <span class="pc-num">${i}</span>
+    `;
+
+    if (keepSelected.has(i)) {
+      selectedPages.add(i);
+      chip.classList.add('selected');
+    }
+
     chip.addEventListener('click', () => {
       const p = parseInt(chip.dataset.page, 10);
       if (selectedPages.has(p)) {
@@ -970,9 +1064,13 @@ function renderReorderItems() {
     item.className = 'file-item';
     item.draggable = true;
     item.dataset.listIdx = listIdx;
+
+    const dataUrl = pageThumbnails.get(pageNum);
     item.innerHTML = `
       <span class="fi-drag">⠿</span>
-      <span class="fi-icon">📄</span>
+      <div class="fi-thumb-wrap${dataUrl ? '' : ' pc-loading'}">
+        ${dataUrl ? `<img src="${dataUrl}" alt="Page ${pageNum}" />` : ''}
+      </div>
       <span class="fi-name">Page ${pageNum}</span>
     `;
     // Drag-and-drop reorder

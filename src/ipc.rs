@@ -4,6 +4,11 @@ use std::sync::mpsc::Sender;
 
 use crate::pdf;
 
+/// Every message from JS is wrapped with a client-generated `id` so that
+/// responses can be matched to the right pending Promise on the JS side,
+/// even if two IPC calls happen to overlap. `#[serde(flatten)]` merges the
+/// rest of the JSON object's keys into `request` based on its own `action`
+/// tag.
 #[derive(Debug, Deserialize)]
 struct Envelope {
     id: String,
@@ -18,6 +23,7 @@ struct ResponseEnvelope<'a> {
     response: IpcResponse,
 }
 
+/// Messages sent from the UI (JS) to Rust.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum IpcRequest {
@@ -75,10 +81,20 @@ pub enum IpcRequest {
     GetPageCount {
         path: String,
     },
+    /// Renders small preview thumbnails for every page, used by the
+    /// delete/reorder pickers so the user sees actual page content instead
+    /// of plain numbered chips or filename rows.
+    GetPageThumbnails {
+        path: String,
+    },
     RevealInFinder {
         path: String,
     },
+    /// Opens a native OS file picker and returns the chosen absolute paths.
+    /// This replaces relying on the browser `File.path` property, which no
+    /// webview actually exposes.
     PickFiles {
+        /// "pdf" or "image"
         kind: String,
         multiple: bool,
     },
@@ -90,6 +106,7 @@ pub struct PageRange {
     pub end: u32,
 }
 
+/// Responses sent from Rust back to the UI.
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum IpcResponse {
@@ -103,11 +120,28 @@ pub enum IpcResponse {
     PageCount {
         count: u32,
     },
+    Thumbnails {
+        pages: Vec<ThumbnailData>,
+    },
     Paths {
         paths: Vec<String>,
     },
 }
 
+#[derive(Debug, Serialize)]
+pub struct ThumbnailData {
+    pub page: u32,
+    pub data_url: String,
+}
+
+/// Builds the IPC handler wry calls for every `window.ipc.postMessage(...)`
+/// from the page. `WebView` itself is not `Send`/`Sync` (it wraps
+/// platform-specific handles like WKWebView), so this handler can't hold a
+/// reference to it directly — instead it sends the finished response script
+/// down `tx`, a plain `mpsc::Sender<String>`. `main.rs` owns the matching
+/// receiver and drains it on the same thread the webview lives on, calling
+/// `evaluate_script` there. This is what actually delivers responses to the
+/// frontend; the earlier version only logged them.
 pub fn make_handler(
     tx: Sender<String>,
 ) -> impl Fn(wry::http::Request<String>) + Send + Sync + 'static {
@@ -364,6 +398,23 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
             }
         }
 
+        IpcRequest::GetPageThumbnails { path } => {
+            match pdf::pdf_page_thumbnails(&PathBuf::from(&path)) {
+                Ok(thumbs) => IpcResponse::Thumbnails {
+                    pages: thumbs
+                        .into_iter()
+                        .map(|t| ThumbnailData {
+                            page: t.page,
+                            data_url: t.data_url,
+                        })
+                        .collect(),
+                },
+                Err(e) => IpcResponse::Error {
+                    message: e.to_string(),
+                },
+            }
+        }
+
         IpcRequest::RevealInFinder { path } => {
             reveal_in_finder(&path);
             IpcResponse::Ok {
@@ -398,6 +449,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
     }
 }
 
+/// Build output path: same directory, stem + suffix + ".pdf"
 fn derive_output(src: &PathBuf, suffix: &str) -> PathBuf {
     let parent = src.parent().unwrap_or_else(|| std::path::Path::new("."));
     let stem = src
@@ -422,6 +474,7 @@ fn reveal_in_finder(path: &str) {
     }
     #[cfg(target_os = "linux")]
     {
+        // Best-effort: open the parent directory
         if let Some(parent) = std::path::Path::new(path).parent() {
             let _ = std::process::Command::new("xdg-open")
                 .arg(parent)

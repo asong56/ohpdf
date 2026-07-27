@@ -1,3 +1,9 @@
+// Suppresses the console/terminal window that Windows otherwise pops up
+// briefly before the real GUI window appears. This only applies in release
+// builds — in debug builds we keep the console so `log`/`println!` output
+// (and any panics) are still visible while developing.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::sync::mpsc;
 
 use tao::{
@@ -24,9 +30,18 @@ fn main() -> anyhow::Result<()> {
 
     let html = include_str!("../ui/index.html");
 
+    // `WebView` isn't `Send`/`Sync` (it wraps platform-specific webview
+    // handles, e.g. WKWebView on macOS), so it can never be stashed inside an
+    // `Arc<Mutex<...>>` and reached from the IPC handler closure directly.
+    // Instead, the IPC handler (which runs on the same thread as the event
+    // loop) just pushes the finished response script onto a plain channel;
+    // the event loop drains that channel every iteration and calls
+    // `evaluate_script` on the webview itself, which it *does* own directly.
     let (tx, rx) = mpsc::channel::<String>();
     let handler = ipc::make_handler(tx);
 
+    // wry 0.46: `WebViewBuilder::new()` takes no arguments, and the window is
+    // supplied to `.build(&window)` instead.
     let webview = WebViewBuilder::new()
         .with_html(html)
         .with_ipc_handler(handler)
@@ -36,6 +51,9 @@ fn main() -> anyhow::Result<()> {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
+        // Drain any IPC responses queued since the last tick and hand them
+        // to the webview, which is safe here because we're on the same
+        // thread the webview was created on.
         while let Ok(script) = rx.try_recv() {
             if let Err(e) = webview.evaluate_script(&script) {
                 log::error!("Failed to deliver IPC response to webview: {}", e);

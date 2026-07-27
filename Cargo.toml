@@ -34,6 +34,7 @@ env_logger = "0.11"
 # actually provides for security reasons. rfd gives us a real OS file dialog
 # from Rust, so we always get a real absolute path.
 rfd = "0.14"
+base64 = "0.22"
 
 [profile.release]
 opt-level = "z"
