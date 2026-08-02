@@ -39,6 +39,10 @@ jobs:
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
+        # NOTE: the `mupdf` crate vendors and builds MuPDF from source via
+        # `mupdf-sys` (there is no `mupdf = "0.8"` prebuilt system package to
+        # link against), so we only need a C/C++ toolchain plus WebKitGTK for
+        # the wry webview — not `libmupdf-dev`.
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -49,6 +53,9 @@ jobs:
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
+        # Vendored MuPDF build needs clang (Xcode command line tools, already
+        # present on GitHub's macOS runners); no Homebrew `mupdf` package is
+        # required or used.
         run: |
           xcode-select --install || true
 
@@ -68,6 +75,8 @@ jobs:
       - name: Package into ZIP (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        # Windows runners don't ship a `zip` binary, so use PowerShell's
+        # built-in Compress-Archive instead.
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item "target/release/${{ matrix.platform.artifact_name }}" dist/
