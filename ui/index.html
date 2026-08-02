@@ -1205,7 +1205,10 @@ async function execute() {
       toast('success', result.message || 'Done!', result.output);
       runBtn.textContent = '✓ Done';
     } else {
-      toast('error', result.message || 'Operation failed.');
+      // If `result.message` is ever empty, dump the raw response instead of
+      // silently showing a useless generic string — that gap is exactly
+      // what made earlier failures impossible to diagnose from the UI.
+      toast('error', result.message || `Operation failed. (raw: ${JSON.stringify(result)})`);
       runBtn.textContent = 'Run';
     }
   } catch (err) {

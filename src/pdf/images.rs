@@ -6,6 +6,8 @@ use mupdf::{
     Size,
 };
 
+use super::pdf_ops::compact_write_options;
+
 /// Render every page of a PDF as PNG images.
 ///
 /// Returns the list of output file paths (one per page).
@@ -109,8 +111,11 @@ pub fn images_to_pdf(images: &[PathBuf], output: &Path) -> Result<()> {
         .with_context(|| format!("Failed to insert image: {}", img_path.display()))?;
     }
 
-    doc.save(output.to_str().context("Output path contains invalid characters.")?)
-        .context("Failed to save PDF.")?;
+    doc.save_with_options(
+        output.to_str().context("Output path contains invalid characters.")?,
+        compact_write_options(),
+    )
+    .context("Failed to save PDF.")?;
 
     log::info!("Combined {} images → {}", images.len(), output.display());
     Ok(())

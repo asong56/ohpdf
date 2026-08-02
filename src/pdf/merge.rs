@@ -2,14 +2,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
-/// Merge multiple PDF files into a single output PDF.
-///
-/// mupdf-rs has no `copy_page_from` method (it never existed in the published
-/// crate). The real way to copy a page between two `PdfDocument`s is:
-///   1. `find_page` on the source to get the page's object (a `PdfObject`)
-///   2. `graft_object` on the destination, which deep-copies that object
-///      (and everything it references) into the destination's own xref table
-///   3. `insert_page` on the destination with the grafted object
+use super::pdf_ops::{compact_write_options, copy_page};
+
+/// Merge multiple PDF files into a single output PDF, in the order given.
 pub fn merge(inputs: &[PathBuf], output: &Path) -> Result<()> {
     anyhow::ensure!(!inputs.is_empty(), "At least one input file is required.");
 
@@ -19,24 +14,29 @@ pub fn merge(inputs: &[PathBuf], output: &Path) -> Result<()> {
         let src = PdfDocument::open(path.to_str().context("Path contains invalid characters.")?)
             .with_context(|| format!("Failed to open file: {}", path.display()))?;
 
-        let page_count = src.page_count().context("Failed to get page count.")?;
+        let page_count = src
+            .page_count()
+            .with_context(|| format!("Failed to get page count for: {}", path.display()))?;
+
+        // A fresh graft map per source document: objects shared *within*
+        // one source file (e.g. a font used on every page) get deduplicated
+        // in the output, without needing to track mappings across unrelated
+        // source files.
+        let mut graft_map = out_doc
+            .new_graft_map()
+            .context("Failed to create a graft map for copying pages.")?;
 
         for i in 0..page_count {
-            let page_obj = src
-                .find_page(i)
-                .with_context(|| format!("Failed to read page {}.", i + 1))?;
-            let grafted = out_doc
-                .graft_object(&page_obj)
-                .with_context(|| format!("Failed to copy page {}.", i + 1))?;
-            // -1 == append at the end of the destination's page tree.
-            out_doc
-                .insert_page(-1, &grafted)
-                .with_context(|| format!("Failed to insert page {}.", i + 1))?;
+            copy_page(&mut out_doc, &src, i, -1, &mut graft_map)
+                .with_context(|| format!("Failed while copying pages from: {}", path.display()))?;
         }
     }
 
     out_doc
-        .save(output.to_str().context("Output path contains invalid characters.")?)
+        .save_with_options(
+            output.to_str().context("Output path contains invalid characters.")?,
+            compact_write_options(),
+        )
         .context("Failed to save merged file.")?;
 
     log::info!("Merged {} files → {}", inputs.len(), output.display());

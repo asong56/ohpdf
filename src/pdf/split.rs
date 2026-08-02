@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
+use super::pdf_ops::copy_pages_to_new_doc;
+
 /// Split a PDF by page ranges.
 ///
 /// `ranges` is a list of (start, end) pairs (1-indexed, inclusive).
@@ -26,22 +28,8 @@ pub fn split(input: &Path, ranges: &[(u32, u32)], outputs: &[PathBuf]) -> Result
             total
         );
 
-        let mut out_doc = PdfDocument::new();
-
-        for page_idx in (start - 1)..*end {
-            let page_obj = src
-                .find_page(page_idx as i32)
-                .with_context(|| format!("Failed to read page {}.", page_idx + 1))?;
-            let grafted = out_doc
-                .graft_object(&page_obj)
-                .with_context(|| format!("Failed to copy page {}.", page_idx + 1))?;
-            out_doc
-                .insert_page(-1, &grafted)
-                .with_context(|| format!("Failed to insert page {}.", page_idx + 1))?;
-        }
-
-        out_doc
-            .save(out_path.to_str().context("Output path contains invalid characters.")?)
+        let page_numbers: Vec<u32> = (*start..=*end).collect();
+        copy_pages_to_new_doc(&src, &page_numbers, out_path)
             .with_context(|| format!("Failed to save file: {}", out_path.display()))?;
 
         log::info!("Split pages {}-{} → {}", start, end, out_path.display());
