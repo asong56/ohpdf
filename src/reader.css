@@ -1,0 +1,337 @@
+/* ============================================================
+   ohPDF Reader — design tokens
+   主题：桌面/墨水 —— 暖纸色 Ribbon + 深色画布 + 荧光笔强调色
+   ============================================================ */
+:root {
+  /* paper & chrome */
+  --paper: #ffffff;
+  --canvas-bg: #1b1d1f;
+  --canvas-bg-soft: #232628;
+  --ribbon-bg: #f6f4f0;
+  --ribbon-border: #e4e0d8;
+  --ribbon-hover: #ece8e0;
+
+  /* ink */
+  --ink: #24221d;
+  --ink-soft: #7a7568;
+  --ink-faint: #a8a297;
+
+  /* accent — highlighter marker */
+  --accent: #f2c40c;
+  --accent-ink: #7a5c00;
+  --accent-ring: rgba(242, 196, 12, 0.35);
+
+  /* secondary — ballpoint ink blue */
+  --ink-blue: #33507a;
+  --ink-blue-soft: #eef2f7;
+
+  --danger: #b8442f;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-page: 0 18px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--canvas-bg);
+}
+
+/* ============================================================
+   Ribbon
+   ============================================================ */
+.ribbon {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: var(--ribbon-bg);
+  border-bottom: 1px solid var(--ribbon-border);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ribbon-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 8px;
+  background: var(--ribbon-border);
+}
+
+.ribbon-spacer { flex: 1; }
+
+.ribbon-meta { color: var(--ink-soft); font-size: 12.5px; }
+
+.doc-title {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 52px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.05s ease;
+}
+.rbtn svg { width: 19px; height: 19px; }
+.rbtn:hover { background: var(--ribbon-hover); }
+.rbtn:active { transform: translateY(1px); }
+
+.rbtn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.rbtn-primary:hover { background: #3a372f; }
+
+.tool-btn.active {
+  background: var(--paper);
+  border-color: var(--ribbon-border);
+  box-shadow: inset 0 0 0 1px var(--ribbon-border), 0 0 0 3px var(--accent-ring);
+}
+.tool-btn.active svg { color: var(--accent-ink); }
+
+.color-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1.5px var(--ribbon-border);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--accent);
+}
+.color-swatch input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.dirty-dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -14px;
+  margin-left: 30px;
+}
+#saveBtn.dirty .dirty-dot { display: block; }
+
+/* ============================================================
+   Stage (viewing canvas area)
+   ============================================================ */
+.stage {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at 50% 0%, var(--canvas-bg-soft) 0%, var(--canvas-bg) 70%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 24px;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.empty-state svg { color: var(--ink-faint); }
+.empty-state p { margin: 0; font-size: 14px; }
+
+.page-wrap { display: flex; justify-content: center; }
+
+.page-shadow {
+  position: relative;
+  box-shadow: var(--shadow-page);
+  background: var(--paper);
+  line-height: 0;
+}
+
+#pageCanvas, #annotCanvas {
+  display: block;
+}
+#annotCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* cursor per mode, applied on .stage via JS class toggle */
+.mode-pan #annotCanvas { cursor: grab; }
+.mode-highlight #annotCanvas,
+.mode-ink #annotCanvas { cursor: crosshair; }
+.mode-note #annotCanvas { cursor: copy; }
+
+/* ============================================================
+   Note popup
+   ============================================================ */
+.note-popup {
+  position: fixed;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 10px;
+  background: var(--paper);
+  border: 1px solid var(--ribbon-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+  transform: translate(-8px, -8px);
+}
+.note-popup input {
+  width: 220px;
+  border: none;
+  outline: none;
+  font: 13px/1.4 var(--font-ui);
+  color: var(--ink);
+}
+.note-popup button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.note-popup button svg { width: 15px; height: 15px; }
+#notePopupOk:hover { background: #e7f6ec; color: #1c7c3f; }
+#notePopupCancel:hover { background: #fbe9e6; color: var(--danger); }
+
+/* ============================================================
+   Status bar
+   ============================================================ */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 8px 16px;
+  background: var(--ribbon-bg);
+  border-top: 1px solid var(--ribbon-border);
+  flex-shrink: 0;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ibtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ibtn svg { width: 16px; height: 16px; }
+.ibtn:hover:not(:disabled) { background: var(--ribbon-hover); }
+.ibtn:disabled { color: var(--ink-faint); cursor: default; }
+
+.page-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.page-indicator input {
+  width: 34px;
+  text-align: right;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: 2px 3px;
+}
+.page-indicator input:focus {
+  border-color: var(--ribbon-border);
+  background: var(--paper);
+  outline: none;
+}
+.page-sep { color: var(--ink-faint); }
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zoom-control input[type="range"] {
+  width: 130px;
+  accent-color: var(--ink-blue);
+}
+#zoomLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  width: 36px;
+}
+
+/* focus visibility for keyboard users */
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--ink-blue);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

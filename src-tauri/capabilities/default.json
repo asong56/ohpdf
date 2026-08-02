@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "ohpdf-read-patch-0801 默认权限：允许打开文件对话框。自定义的 ohpdf_* 命令是普通 Tauri command，不受此文件里的 ACL 限制，注册在 invoke_handler 里即可直接调用。",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default"
+  ]
+}

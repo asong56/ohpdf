@@ -1,0 +1,32 @@
+[package]
+name = "ohpdf-read-patch-0801"
+version = "0.1.0"
+description = "PDF reading + annotation patch for ohpdf toolkit"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+# --- 如果合并进现有项目：下面这些依赖大概率你已经有大部分了
+# （tauri、serde、serde_json、mupdf），只需要新增 tauri-plugin-dialog
+# 和 base64（如果你现有代码里还没有 base64 的话）。
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+# [VERIFY] 版本号按你现有项目里实际能跑起来的那个 mupdf 版本为准，
+# 这里写的 "0.8" 是参考值，不是编译验证过的确定值。
+mupdf = { version = "0.8", default-features = false, features = ["base14-fonts"] }
+
+[profile.release]
+opt-level = "s"       # 优化体积而非速度
+lto = true             # 链接时优化，跨 crate 内联/裁剪死代码
+codegen-units = 1      # 单元少一点，优化空间更大（编译变慢，属于一次性成本）
+panic = "abort"        # 去掉 unwind 所需的额外代码和表
+strip = true           # 去掉符号表/调试信息
+
+[profile.release.build-override]
+opt-level = "s"
