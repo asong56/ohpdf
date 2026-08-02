@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use tao::event_loop::EventLoopProxy;
 
 use crate::pdf;
+use crate::WakeUp;
 
 /// Every message from JS is wrapped with a client-generated `id` so that
 /// responses can be matched to the right pending Promise on the JS side,
@@ -137,47 +139,146 @@ pub struct ThumbnailData {
 /// Builds the IPC handler wry calls for every `window.ipc.postMessage(...)`
 /// from the page. `WebView` itself is not `Send`/`Sync` (it wraps
 /// platform-specific handles like WKWebView), so this handler can't hold a
-/// reference to it directly — instead it sends the finished response script
-/// down `tx`, a plain `mpsc::Sender<String>`. `main.rs` owns the matching
-/// receiver and drains it on the same thread the webview lives on, calling
-/// `evaluate_script` there. This is what actually delivers responses to the
-/// frontend; the earlier version only logged them.
+/// reference to it directly — instead the actual work runs on a spawned
+/// background thread, which sends the finished response script down `tx` (a
+/// plain `mpsc::Sender<String>`) and then wakes the event loop via `proxy` so
+/// `main.rs` (which owns the matching receiver, on the same thread the
+/// webview lives on) drains it and calls `evaluate_script` immediately.
+///
+/// Running the PDF work on a background thread — rather than directly
+/// inline in this handler — matters because this handler itself executes on
+/// the webview's own message-handling thread. A large Compress/Merge/etc.
+/// call can take a real amount of time; running it inline would block that
+/// thread for the whole duration, freezing the entire window (no repaints,
+/// no input) until it finished. Spawning it means the UI stays responsive
+/// (the "Processing…" spinner keeps animating) the whole time, and the
+/// result still gets delivered the moment it's ready via the same
+/// wake-up-the-event-loop mechanism.
+///
+/// The wake-up itself is not optional either: the event loop runs with
+/// `ControlFlow::Wait`, which only re-checks the channel when a *window*
+/// event (input, resize, etc.) shows up — merely pushing to `tx` does not
+/// wake a `Wait`ing loop on its own. Without explicitly waking it, a
+/// finished operation's result could sit in the channel indefinitely (the UI
+/// stuck showing "Processing…") until the user happened to move the mouse or
+/// otherwise generate a window event.
 pub fn make_handler(
     tx: Sender<String>,
+    proxy: EventLoopProxy<WakeUp>,
 ) -> impl Fn(wry::http::Request<String>) + Send + Sync + 'static {
     move |req: wry::http::Request<String>| {
         let body = req.body();
 
-        let (id, response) = match serde_json::from_str::<Envelope>(body) {
-            Ok(env) => {
-                let id = env.id;
-                let response = handle_request(env.request);
-                (id, response)
+        // Parse just enough up front to special-case native file-dialog
+        // requests, which — unlike every other action here — must run
+        // synchronously on this same thread. On macOS in particular, Cocoa
+        // requires all NSOpenPanel/NSSavePanel interaction to happen on the
+        // main thread; calling it from a spawned background thread panics
+        // outright ("Fallback Sync Dialog Must Be Spawned On Main Thread").
+        // This handler already runs on the webview's own thread, which for
+        // a single-window desktop app *is* the main thread, so keeping
+        // dialog calls right here (rather than moving them to the
+        // background pool below) is both correct and effectively free —
+        // they're instant to dispatch and only return once the user closes
+        // the dialog.
+        let envelope = match serde_json::from_str::<Envelope>(body) {
+            Ok(env) => env,
+            Err(e) => {
+                let json = serde_json::to_string(&ResponseEnvelope {
+                    id: "unknown",
+                    response: IpcResponse::Error {
+                        message: format!("Invalid request: {}", e),
+                    },
+                })
+                .unwrap_or_default();
+                let script = format!("window.__ipc_cb && window.__ipc_cb({});", json);
+                let _ = tx.send(script);
+                let _ = proxy.send_event(WakeUp);
+                return;
             }
-            Err(e) => (
-                "unknown".to_string(),
-                IpcResponse::Error {
-                    message: format!("Invalid request: {}", e),
-                },
-            ),
         };
 
-        let wrapped = ResponseEnvelope {
-            id: &id,
-            response,
-        };
-        let json = serde_json::to_string(&wrapped).unwrap_or_else(|e| {
-            format!(
-                r#"{{"id":"{}","status":"error","message":"serialization failed: {}"}}"#,
-                id, e
-            )
-        });
-
-        let script = format!("window.__ipc_cb && window.__ipc_cb({});", json);
-
-        if let Err(e) = tx.send(script) {
-            log::error!("Failed to queue IPC response (event loop gone?): {}", e);
+        if matches!(envelope.request, IpcRequest::PickFiles { .. }) {
+            let id = envelope.id;
+            let response = handle_request(envelope.request);
+            let json = serde_json::to_string(&ResponseEnvelope {
+                id: &id,
+                response,
+            })
+            .unwrap_or_else(|e| {
+                format!(
+                    r#"{{"id":"{}","status":"error","message":"serialization failed: {}"}}"#,
+                    id, e
+                )
+            });
+            let script = format!("window.__ipc_cb && window.__ipc_cb({});", json);
+            if let Err(e) = tx.send(script) {
+                log::error!("Failed to queue IPC response (event loop gone?): {}", e);
+                return;
+            }
+            if let Err(e) = proxy.send_event(WakeUp) {
+                log::error!("Failed to wake event loop for IPC response: {}", e);
+            }
+            return;
         }
+
+        // Everything else (PDF processing, thumbnail rendering, etc.) can
+        // genuinely take a while for large files, so it runs on a spawned
+        // background thread instead — keeping it here would freeze the
+        // whole window (no repaints, no input) for the entire duration of
+        // e.g. a large Compress or Merge job.
+        let tx = tx.clone();
+        let proxy = proxy.clone();
+        std::thread::spawn(move || {
+            let id = envelope.id;
+            let request = envelope.request;
+
+            // Guard against an unexpected panic inside mupdf/our own code
+            // taking down just this thread silently, which — since nothing
+            // would ever send a response back — would leave the UI stuck
+            // showing "Processing…" forever with no way to know something
+            // went wrong. Catching it here turns that into a normal error
+            // response instead. `AssertUnwindSafe` is fine: `request` isn't
+            // shared with anything else that could observe it half-mutated
+            // after an unwind.
+            let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                handle_request(request)
+            }))
+            .unwrap_or_else(|panic_payload| {
+                let msg = panic_payload
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| panic_payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown panic".to_string());
+                log::error!("PDF operation panicked: {}", msg);
+                IpcResponse::Error {
+                    message: format!("Internal error: {}", msg),
+                }
+            });
+
+            let json = serde_json::to_string(&ResponseEnvelope {
+                id: &id,
+                response,
+            })
+            .unwrap_or_else(|e| {
+                format!(
+                    r#"{{"id":"{}","status":"error","message":"serialization failed: {}"}}"#,
+                    id, e
+                )
+            });
+
+            let script = format!("window.__ipc_cb && window.__ipc_cb({});", json);
+
+            if let Err(e) = tx.send(script) {
+                log::error!("Failed to queue IPC response (event loop gone?): {}", e);
+                return;
+            }
+            // Wake the event loop so it delivers this response right away
+            // instead of waiting on unrelated window activity.
+            if let Err(e) = proxy.send_event(WakeUp) {
+                log::error!("Failed to wake event loop for IPC response: {}", e);
+            }
+        });
     }
 }
 

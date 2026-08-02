@@ -6,6 +6,7 @@ mod pages;
 mod images;
 mod watermark;
 mod thumbnails;
+mod pdf_ops;
 
 pub use merge::merge;
 pub use split::split;

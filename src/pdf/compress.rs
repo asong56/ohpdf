@@ -1,6 +1,8 @@
 use std::path::Path;
 use anyhow::{Context, Result};
-use mupdf::pdf::{PdfDocument, PdfWriteOptions};
+use mupdf::pdf::PdfDocument;
+
+use super::pdf_ops::compact_write_options;
 
 /// Compress a PDF by re-writing it with optimized output settings.
 ///
@@ -15,10 +17,8 @@ pub fn compress(input: &Path, output: &Path, quality: Option<u8>) -> Result<()> 
 
     let q = quality.unwrap_or(75).clamp(10, 100);
 
-    let mut opts = PdfWriteOptions::default();
-    opts.set_garbage(true) // remove unused objects (garbage collection)
-        .set_compress(true)
-        .set_compress_images(true)
+    let mut opts = compact_write_options(); // garbage + compress
+    opts.set_compress_images(true)
         .set_compress_fonts(true)
         .set_clean(true)
         // Lower "quality" tiers additionally linearize (fast web view) and
