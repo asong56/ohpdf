@@ -9,7 +9,7 @@ use std::sync::mpsc;
 use tao::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
     window::WindowBuilder,
 };
 use wry::{WebContext, WebViewBuilder};
@@ -26,7 +26,7 @@ pub struct WakeUp;
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let event_loop = EventLoop::<WakeUp>::with_user_event();
+    let event_loop = EventLoopBuilder::<WakeUp>::with_user_event().build();
 
     let window = WindowBuilder::new()
         .with_title("OhPDF")
@@ -83,12 +83,16 @@ fn main() -> anyhow::Result<()> {
 
     // wry 0.46: `WebViewBuilder::new()` takes no arguments, and the window is
     // supplied to `.build(&window)` instead.
-    let webview = WebViewBuilder::new_with_web_context(&mut web_context)
+    let webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_html(html)
         .with_ipc_handler(handler)
         .with_devtools(cfg!(debug_assertions))
         .build(&window)?;
 
+    // `EventLoop::run` never returns (it takes over the process and exits it
+    // directly), so its return type doesn't unify with `main`'s
+    // `anyhow::Result<()>`. There's nothing to propagate after this point
+    // anyway, so we just let it run last.
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -114,5 +118,5 @@ fn main() -> anyhow::Result<()> {
                 log::error!("Failed to deliver IPC response to webview: {}", e);
             }
         }
-    });
+    })
 }
