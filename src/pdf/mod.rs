@@ -7,6 +7,8 @@ mod images;
 mod watermark;
 mod thumbnails;
 mod pdf_ops;
+mod reader;
+mod annotations;
 
 pub use merge::merge;
 pub use split::split;
@@ -16,3 +18,5 @@ pub use pages::{delete_pages, extract_pages, rotate_pages, reorder_pages, page_c
 pub use images::{pdf_to_images, images_to_pdf};
 pub use watermark::{add_watermark, WatermarkOptions};
 pub use thumbnails::pdf_page_thumbnails;
+pub use reader::render_page;
+pub use annotations::{load_annotations, save_annotations, Annotation, PageAnnotations};

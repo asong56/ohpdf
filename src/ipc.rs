@@ -89,6 +89,26 @@ pub enum IpcRequest {
     GetPageThumbnails {
         path: String,
     },
+    /// Renders one page at full reading resolution, for the Read &
+    /// Annotate view. `page` is 1-indexed. `dpi` follows the current zoom
+    /// level; if omitted, a comfortable on-screen default is used.
+    RenderPage {
+        path: String,
+        page: u32,
+        dpi: Option<u32>,
+    },
+    /// Loads any previously-saved annotations (highlights, notes, ink
+    /// strokes) for a document from its sidecar `.ohpdf-annot.json` file.
+    /// Returns an empty set if none exist yet — this is not an error.
+    LoadAnnotations {
+        path: String,
+    },
+    /// Saves the full set of per-page annotations for a document to its
+    /// sidecar file. Never touches the PDF itself.
+    SaveAnnotations {
+        path: String,
+        annotations: pdf::PageAnnotations,
+    },
     RevealInFinder {
         path: String,
     },
@@ -124,6 +144,12 @@ pub enum IpcResponse {
     },
     Thumbnails {
         pages: Vec<ThumbnailData>,
+    },
+    Page {
+        data_url: String,
+    },
+    Annotations {
+        pages: pdf::PageAnnotations,
     },
     Paths {
         paths: Vec<String>,
@@ -509,6 +535,41 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                             data_url: t.data_url,
                         })
                         .collect(),
+                },
+                Err(e) => IpcResponse::Error {
+                    message: e.to_string(),
+                },
+            }
+        }
+
+        IpcRequest::RenderPage { path, page, dpi } => {
+            let src = PathBuf::from(&path);
+            // 96 matches the reader's own "100% zoom" baseline on the JS
+            // side; this fallback only matters if a request is ever sent
+            // without an explicit dpi, which the reader itself never does.
+            let dpi = dpi.unwrap_or(96).clamp(36, 600);
+            match pdf::render_page(&src, page, dpi) {
+                Ok(data_url) => IpcResponse::Page { data_url },
+                Err(e) => IpcResponse::Error {
+                    message: e.to_string(),
+                },
+            }
+        }
+
+        IpcRequest::LoadAnnotations { path } => {
+            match pdf::load_annotations(&PathBuf::from(&path)) {
+                Ok(pages) => IpcResponse::Annotations { pages },
+                Err(e) => IpcResponse::Error {
+                    message: e.to_string(),
+                },
+            }
+        }
+
+        IpcRequest::SaveAnnotations { path, annotations } => {
+            match pdf::save_annotations(&PathBuf::from(&path), &annotations) {
+                Ok(_) => IpcResponse::Ok {
+                    output: path,
+                    message: Some("Annotations saved.".into()),
                 },
                 Err(e) => IpcResponse::Error {
                     message: e.to_string(),

@@ -67,6 +67,7 @@
       overflow-x: hidden;
       padding: 28px 24px 24px;
     }
+    #main.hidden { display: none; }
 
     /* ── Home screen ── */
     #home { display: block; }
@@ -492,6 +493,234 @@
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Reader view (Read & Annotate) ──────────
+       Uses the same tokens as the rest of the app (--bg/--surface/--border/
+       --text/--radius/--mono/…) rather than a separate palette, and reuses
+       .rotate-options/.rotate-chip (already styled for the Rotate-Pages
+       and Watermark-rotation pickers) for the mode selector below, so it
+       looks like a native part of OhPDF rather than an imported widget. ── */
+    #reader-view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    #reader-view.active { display: flex; }
+
+    .reader-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .reader-toolbar .back-btn { margin-bottom: 0; }
+    .reader-toolbar-controls {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .reader-toolbar-controls.visible { display: flex; }
+    .reader-toolbar-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      margin: 0 2px;
+    }
+    .reader-toolbar-spacer { flex: 1; }
+    .reader-doc-title {
+      font-size: 12px;
+      color: var(--text-dim);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .reader-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font);
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+    .reader-btn:hover { border-color: #555; color: var(--text); }
+
+    .dirty-dot {
+      display: none;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text);
+    }
+    #reader-save-btn.dirty .dirty-dot { display: inline-block; }
+
+    .reader-color-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .reader-color-swatch input[type="color"] {
+      position: absolute;
+      inset: -4px;
+      width: calc(100% + 8px);
+      height: calc(100% + 8px);
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0;
+    }
+
+    .reader-stage {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 28px 24px;
+    }
+
+    .reader-empty {
+      display: none;
+      position: absolute;
+      inset: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    .reader-empty.visible { display: flex; }
+    .reader-empty .re-icon { font-size: 40px; opacity: 0.6; }
+    .reader-empty p { font-size: 13px; max-width: 280px; }
+    .reader-empty-btn { width: auto !important; padding-left: 24px; padding-right: 24px; }
+
+    .reader-page-wrap { display: none; justify-content: center; }
+    .reader-page-wrap.visible { display: flex; }
+    .reader-page-shadow {
+      position: relative;
+      line-height: 0;
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+    #reader-page-canvas, #reader-annot-canvas { display: block; }
+    #reader-annot-canvas { position: absolute; top: 0; left: 0; }
+    .reader-stage.mode-highlight #reader-annot-canvas,
+    .reader-stage.mode-ink #reader-annot-canvas { cursor: crosshair; }
+    .reader-stage.mode-note #reader-annot-canvas { cursor: copy; }
+
+    .reader-note-popup {
+      position: fixed;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 6px 6px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      z-index: 250;
+    }
+    .reader-note-popup.visible { display: flex; }
+    .reader-note-popup input {
+      width: 200px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+    }
+    .reader-note-popup button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    .reader-note-popup button:hover { color: var(--text); background: var(--surface); }
+
+    .reader-statusbar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .reader-statusbar.visible { display: flex; }
+    .reader-page-nav { display: flex; align-items: center; gap: 8px; }
+    .reader-icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .reader-icon-btn:hover:not(:disabled) { border-color: #555; }
+    .reader-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .reader-page-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .reader-page-indicator input {
+      width: 34px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font: inherit;
+      padding: 3px 2px;
+    }
+    .reader-zoom { display: flex; align-items: center; gap: 8px; }
+    .reader-zoom input[type="range"] { width: 120px; accent-color: var(--text); }
+    .reader-zoom-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      width: 34px;
+    }
   </style>
 </head>
 <body>
@@ -527,6 +756,72 @@
       <div id="task-body"></div>
     </div>
 
+  </div>
+
+  <!-- Reader view (Read & Annotate) -->
+  <div id="reader-view">
+    <div class="reader-toolbar">
+      <button class="back-btn" id="reader-back-btn">← Back</button>
+
+      <div class="reader-toolbar-controls" id="reader-controls">
+        <div class="reader-toolbar-divider"></div>
+        <button class="reader-btn" id="reader-open-btn" title="Open a different PDF (Ctrl/Cmd+O)">Open</button>
+        <div class="rotate-options" id="reader-mode-group">
+          <div class="rotate-chip selected" data-mode="pan">Pan</div>
+          <div class="rotate-chip" data-mode="highlight">Highlight</div>
+          <div class="rotate-chip" data-mode="note">Note</div>
+          <div class="rotate-chip" data-mode="ink">Draw</div>
+        </div>
+        <label class="reader-color-swatch" title="Annotation color">
+          <input type="color" id="reader-color" value="#f2c40c" />
+        </label>
+        <button class="reader-btn" id="reader-undo-btn" title="Undo last mark on this page (Ctrl/Cmd+Z)">Undo</button>
+        <button class="reader-btn" id="reader-save-btn" title="Save annotations (Ctrl/Cmd+S)">
+          Save <i class="dirty-dot" id="reader-dirty-dot"></i>
+        </button>
+      </div>
+
+      <div class="reader-toolbar-spacer"></div>
+      <span class="reader-doc-title" id="reader-doc-title"></span>
+    </div>
+
+    <div class="reader-stage mode-pan" id="reader-stage">
+      <div class="reader-empty visible" id="reader-empty">
+        <div class="re-icon">📖</div>
+        <p>Open a PDF to read, highlight, add sticky notes, and draw on it.</p>
+        <button class="btn-primary reader-empty-btn" id="reader-empty-open-btn">Choose PDF File</button>
+      </div>
+
+      <div class="reader-page-wrap" id="reader-page-wrap">
+        <div class="reader-page-shadow">
+          <canvas id="reader-page-canvas"></canvas>
+          <canvas id="reader-annot-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky-note text input popup -->
+    <div class="reader-note-popup" id="reader-note-popup">
+      <input id="reader-note-input" type="text" placeholder="Note text…" />
+      <button id="reader-note-ok" title="Add">✓</button>
+      <button id="reader-note-cancel" title="Cancel">✕</button>
+    </div>
+
+    <div class="reader-statusbar" id="reader-statusbar">
+      <div class="reader-page-nav">
+        <button class="reader-icon-btn" id="reader-prev-btn" title="Previous page (←)">‹</button>
+        <span class="reader-page-indicator">
+          <input id="reader-page-num" type="text" inputmode="numeric" value="0" />
+          <span>/</span>
+          <span id="reader-page-total">0</span>
+        </span>
+        <button class="reader-icon-btn" id="reader-next-btn" title="Next page (→)">›</button>
+      </div>
+      <div class="reader-zoom">
+        <input id="reader-zoom" type="range" min="50" max="300" step="10" value="100" />
+        <span class="reader-zoom-label" id="reader-zoom-label">100%</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -642,6 +937,14 @@ const TOOLS = [
     desc: 'Add a semi-transparent text watermark to every page, e.g. Confidential or Draft.',
     multi: false,
   },
+  {
+    id: 'read',
+    icon: '📖',
+    name: 'Read & Annotate',
+    hint: 'View pages, highlight, and mark up',
+    desc: 'Open a PDF to read, highlight, add sticky notes, and draw on it. Marks are saved next to the file, not into it.',
+    isReader: true,
+  },
 ];
 
 // ── State ─────────────────────────────────────
@@ -657,6 +960,7 @@ let reorderOrder = [];  // 1-indexed
 let splitRanges = [];
 
 // ── DOM refs ──────────────────────────────────
+const mainEl     = document.getElementById('main');
 const home       = document.getElementById('home');
 const taskView   = document.getElementById('task-view');
 const taskTitle  = document.getElementById('task-title');
@@ -665,6 +969,7 @@ const taskBody   = document.getElementById('task-body');
 const backBtn    = document.getElementById('back-btn');
 const toolGrid   = document.getElementById('tool-grid');
 const dropOverlay = document.getElementById('drop-overlay');
+const readerView = document.getElementById('reader-view');
 
 // ── Render home grid ──────────────────────────
 function renderHome() {
@@ -688,6 +993,13 @@ function openTool(id, droppedFiles) {
   currentTool = TOOLS.find(t => t.id === id);
   if (!currentTool) return;
 
+  if (currentTool.isReader) {
+    mainEl.classList.add('hidden');
+    readerView.classList.add('active');
+    openReader();
+    return;
+  }
+
   files = droppedFiles ? Array.from(droppedFiles) : [];
   selectedPages = new Set();
   reorderOrder = [];
@@ -708,6 +1020,8 @@ backBtn.addEventListener('click', goHome);
 function goHome() {
   currentTool = null;
   files = [];
+  mainEl.classList.remove('hidden');
+  readerView.classList.remove('active');
   home.classList.remove('hidden');
   taskView.classList.remove('active');
   taskBody.innerHTML = '';
@@ -1340,6 +1654,448 @@ function revealFile(path) {
   sendIpc({ action: 'reveal_in_finder', path });
 }
 
+// ── Reader (Read & Annotate) ───────────────────
+// Ported from a standalone prototype onto this file's existing sendIpc()/
+// toast() plumbing instead of a separate frontend + IPC bridge, so it's one
+// more view in the same single-file app rather than a second application.
+// All state here is kept separate from the generic task-flow state above
+// (files/pageCount/selectedPages/...) since the reader manages one open
+// document at a time rather than a list of files to process.
+
+let readerPath = null;
+let readerPage = 1;             // 1-indexed, matching every other page
+                                 // number this app exposes (thumbnails,
+                                 // rotate, etc.) — unlike PDF.js-style
+                                 // viewers, there's no 0-indexed page here.
+let readerPageCount = 0;
+let readerZoomPct = 100;
+let readerDpi = 96;              // 96dpi = 100% zoom (1 CSS px per PDF pt)
+let readerMode = 'pan';          // pan | highlight | note | ink
+let readerColor = '#f2c40c';
+let readerAnnotations = {};      // { "1": [ {type,...}, ... ], ... }
+let readerDragStart = null;      // in-progress highlight rect (PDF pt space)
+let readerInkDrawing = null;     // in-progress ink stroke (array of PDF pt points)
+let readerDirty = false;
+let readerNotePopupResolver = null;
+
+const readerControls    = document.getElementById('reader-controls');
+const readerDocTitleEl  = document.getElementById('reader-doc-title');
+const readerStage       = document.getElementById('reader-stage');
+const readerEmpty       = document.getElementById('reader-empty');
+const readerPageWrap    = document.getElementById('reader-page-wrap');
+const readerPageCanvas  = document.getElementById('reader-page-canvas');
+const readerAnnotCanvas = document.getElementById('reader-annot-canvas');
+const readerPageCtx     = readerPageCanvas.getContext('2d');
+const readerAnnotCtx    = readerAnnotCanvas.getContext('2d');
+const readerStatusbar   = document.getElementById('reader-statusbar');
+const readerPageNumInput = document.getElementById('reader-page-num');
+const readerPageTotalEl = document.getElementById('reader-page-total');
+const readerZoomSlider  = document.getElementById('reader-zoom');
+const readerZoomLabel   = document.getElementById('reader-zoom-label');
+const readerSaveBtn     = document.getElementById('reader-save-btn');
+const readerNotePopup   = document.getElementById('reader-note-popup');
+const readerNoteInput   = document.getElementById('reader-note-input');
+
+// ── Coordinate helpers (PDF point space <-> canvas pixel space) ──
+function readerScale() { return readerDpi / 72; }
+
+function readerPtToPx(x, y) {
+  const s = readerScale();
+  return { x: x * s, y: y * s };
+}
+
+function readerPxToPt(x, y) {
+  const s = readerScale();
+  return { x: x / s, y: y / s };
+}
+
+// Convert a pointer event (screen coords) to canvas-pixel coords,
+// accounting for any CSS scaling of the canvas element.
+function readerEventToCanvasPx(evt) {
+  const rect = readerAnnotCanvas.getBoundingClientRect();
+  const scaleX = readerAnnotCanvas.width / rect.width;
+  const scaleY = readerAnnotCanvas.height / rect.height;
+  return {
+    x: (evt.clientX - rect.left) * scaleX,
+    y: (evt.clientY - rect.top) * scaleY,
+  };
+}
+
+// ── Open / navigate ────────────────────────────
+function openReader() {
+  // Always starts fresh from the empty state when the tool is (re)selected
+  // from the home grid, same as every other tool card — reopening the
+  // last file is one click away via the empty state's own button.
+  readerPath = null;
+  readerPage = 1;
+  readerPageCount = 0;
+  readerAnnotations = {};
+  readerDirty = false;
+  readerMode = 'pan';
+  readerZoomPct = 100;
+  readerDpi = 96;
+  readerZoomSlider.value = 100;
+  readerZoomLabel.textContent = '100%';
+  updateReaderModeButtons();
+  readerControls.classList.remove('visible');
+  readerStatusbar.classList.remove('visible');
+  readerPageWrap.classList.remove('visible');
+  readerEmpty.classList.add('visible');
+  readerDocTitleEl.textContent = '';
+  readerSaveBtn.classList.remove('dirty');
+  readerNotePopup.classList.remove('visible');
+  readerNotePopupResolver = null;
+}
+
+function pickAndOpenReaderPdf() {
+  sendIpc({ action: 'pick_files', kind: 'pdf', multiple: false })
+    .then(res => {
+      if (res.status === 'paths' && res.paths && res.paths.length) {
+        openReaderPath(res.paths[0]);
+      }
+    })
+    .catch(err => toast('error', String(err)));
+}
+
+async function openReaderPath(path) {
+  try {
+    const countRes = await sendIpc({ action: 'get_page_count', path });
+    if (countRes.status !== 'page_count') {
+      toast('error', countRes.message || 'Could not open that file.');
+      return;
+    }
+
+    readerPath = path;
+    readerPageCount = countRes.count;
+    readerPage = 1;
+    readerDocTitleEl.textContent = path.split(/[\\/]/).pop();
+    readerPageTotalEl.textContent = String(readerPageCount);
+
+    const annotRes = await sendIpc({ action: 'load_annotations', path });
+    readerAnnotations = annotRes.status === 'annotations' ? (annotRes.pages || {}) : {};
+    readerDirty = false;
+    readerSaveBtn.classList.remove('dirty');
+
+    readerEmpty.classList.remove('visible');
+    readerControls.classList.add('visible');
+    readerStatusbar.classList.add('visible');
+    readerPageWrap.classList.add('visible');
+
+    await goToReaderPage(1);
+  } catch (err) {
+    toast('error', String(err));
+  }
+}
+
+async function goToReaderPage(n) {
+  if (!readerPath || n < 1 || n > readerPageCount) return;
+  readerPage = n;
+  readerPageNumInput.value = String(n);
+  updateReaderNavButtons();
+  await renderReaderPage();
+}
+
+async function renderReaderPage() {
+  if (!readerPath) return;
+  try {
+    const res = await sendIpc({
+      action: 'render_page',
+      path: readerPath,
+      page: readerPage,
+      dpi: readerDpi,
+    });
+    if (res.status !== 'page') {
+      toast('error', res.message || 'Failed to render that page.');
+      return;
+    }
+    await drawReaderPageImage(res.data_url);
+  } catch (err) {
+    toast('error', String(err));
+  }
+}
+
+function drawReaderPageImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      readerPageCanvas.width = img.width;
+      readerPageCanvas.height = img.height;
+      readerAnnotCanvas.width = img.width;
+      readerAnnotCanvas.height = img.height;
+      readerPageCanvas.style.width = img.width + 'px';
+      readerPageCanvas.style.height = img.height + 'px';
+      readerAnnotCanvas.style.width = img.width + 'px';
+      readerAnnotCanvas.style.height = img.height + 'px';
+      readerPageCtx.drawImage(img, 0, 0);
+      redrawReaderAnnotations();
+      resolve();
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function updateReaderNavButtons() {
+  document.getElementById('reader-prev-btn').disabled = readerPage <= 1;
+  document.getElementById('reader-next-btn').disabled = readerPage >= readerPageCount;
+}
+
+// ── Annotation rendering ───────────────────────
+function redrawReaderAnnotations() {
+  readerAnnotCtx.clearRect(0, 0, readerAnnotCanvas.width, readerAnnotCanvas.height);
+  const list = readerAnnotations[String(readerPage)] || [];
+  for (const a of list) drawReaderAnnotation(a);
+}
+
+function drawReaderAnnotation(a) {
+  if (a.type === 'highlight') {
+    const p1 = readerPtToPx(a.rect.x, a.rect.y);
+    const p2 = readerPtToPx(a.rect.x + a.rect.w, a.rect.y + a.rect.h);
+    readerAnnotCtx.fillStyle = hexToRgba(a.color, 0.35);
+    readerAnnotCtx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+  } else if (a.type === 'note') {
+    const p = readerPtToPx(a.point.x, a.point.y);
+    readerAnnotCtx.beginPath();
+    readerAnnotCtx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+    readerAnnotCtx.fillStyle = a.color;
+    readerAnnotCtx.fill();
+    readerAnnotCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+    readerAnnotCtx.lineWidth = 1;
+    readerAnnotCtx.stroke();
+    readerAnnotCtx.fillStyle = '#24221d';
+    readerAnnotCtx.font = 'bold 11px system-ui';
+    readerAnnotCtx.textAlign = 'center';
+    readerAnnotCtx.textBaseline = 'middle';
+    readerAnnotCtx.fillText('!', p.x, p.y + 0.5);
+  } else if (a.type === 'ink') {
+    if (!a.points || a.points.length < 2) return;
+    readerAnnotCtx.strokeStyle = a.color;
+    readerAnnotCtx.lineWidth = Math.max(1.5, (a.width || 2) * readerScale() * 0.5);
+    readerAnnotCtx.lineJoin = 'round';
+    readerAnnotCtx.lineCap = 'round';
+    readerAnnotCtx.beginPath();
+    a.points.forEach((pt, i) => {
+      const p = readerPtToPx(pt.x, pt.y);
+      if (i === 0) readerAnnotCtx.moveTo(p.x, p.y);
+      else readerAnnotCtx.lineTo(p.x, p.y);
+    });
+    readerAnnotCtx.stroke();
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function rectFrom(a, b) {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x),
+    h: Math.abs(b.y - a.y),
+  };
+}
+
+function pushReaderAnnotation(a) {
+  const key = String(readerPage);
+  if (!readerAnnotations[key]) readerAnnotations[key] = [];
+  readerAnnotations[key].push(a);
+  redrawReaderAnnotations();
+  markReaderDirty();
+}
+
+function markReaderDirty() {
+  readerDirty = true;
+  readerSaveBtn.classList.add('dirty');
+}
+
+async function saveReaderAnnotations(opts) {
+  const silent = !!(opts && opts.silent);
+  if (!readerPath) return;
+  try {
+    const res = await sendIpc({
+      action: 'save_annotations',
+      path: readerPath,
+      annotations: readerAnnotations,
+    });
+    if (res.status === 'ok') {
+      readerDirty = false;
+      readerSaveBtn.classList.remove('dirty');
+      if (!silent) toast('success', 'Annotations saved.');
+    } else if (!silent) {
+      toast('error', res.message || 'Failed to save annotations.');
+    }
+  } catch (err) {
+    if (!silent) toast('error', String(err));
+  }
+}
+
+function undoReaderLast() {
+  const key = String(readerPage);
+  const list = readerAnnotations[key];
+  if (list && list.length) {
+    list.pop();
+    redrawReaderAnnotations();
+    markReaderDirty();
+  }
+}
+
+// Saves first (quietly) if there are unsaved marks, then proceeds — used
+// for Back and "open a different file", so leaving the reader can never
+// silently lose annotations, without needing a native confirm() dialog
+// (which the rest of this app avoids; see the note popup below).
+async function leaveReaderSafely(next) {
+  if (readerDirty) {
+    await saveReaderAnnotations({ silent: true });
+  }
+  next();
+}
+
+// ── Note popup (custom, avoids relying on window.prompt in a webview) ──
+function showReaderNotePopup(screenX, screenY) {
+  readerNotePopup.style.left = screenX + 'px';
+  readerNotePopup.style.top = screenY + 'px';
+  readerNotePopup.classList.add('visible');
+  readerNoteInput.value = '';
+  readerNoteInput.focus();
+  return new Promise(resolve => { readerNotePopupResolver = resolve; });
+}
+
+function hideReaderNotePopup() {
+  readerNotePopup.classList.remove('visible');
+  readerNotePopupResolver = null;
+}
+
+document.getElementById('reader-note-ok').addEventListener('click', () => {
+  const val = readerNoteInput.value.trim();
+  if (readerNotePopupResolver) readerNotePopupResolver(val || null);
+  hideReaderNotePopup();
+});
+document.getElementById('reader-note-cancel').addEventListener('click', () => {
+  if (readerNotePopupResolver) readerNotePopupResolver(null);
+  hideReaderNotePopup();
+});
+readerNoteInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('reader-note-ok').click();
+  if (e.key === 'Escape') document.getElementById('reader-note-cancel').click();
+});
+
+async function addReaderNoteAt(pt, screenX, screenY) {
+  const text = await showReaderNotePopup(screenX, screenY);
+  if (text) pushReaderAnnotation({ type: 'note', color: readerColor, point: pt, text });
+}
+
+// ── Pointer interaction on the annotation canvas ──
+readerAnnotCanvas.addEventListener('pointerdown', evt => {
+  if (readerMode === 'pan' || !readerPath) return;
+  const { x, y } = readerEventToCanvasPx(evt);
+  const pt = readerPxToPt(x, y);
+
+  if (readerMode === 'highlight') {
+    readerDragStart = pt;
+    readerAnnotCanvas.setPointerCapture(evt.pointerId);
+  } else if (readerMode === 'note') {
+    addReaderNoteAt(pt, evt.clientX, evt.clientY);
+  } else if (readerMode === 'ink') {
+    readerInkDrawing = [pt];
+    readerAnnotCanvas.setPointerCapture(evt.pointerId);
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointermove', evt => {
+  if (readerMode === 'highlight' && readerDragStart) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    redrawReaderAnnotations();
+    drawReaderAnnotation({ type: 'highlight', color: readerColor, rect: rectFrom(readerDragStart, pt) });
+  } else if (readerMode === 'ink' && readerInkDrawing) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    readerInkDrawing.push(pt);
+    redrawReaderAnnotations();
+    drawReaderAnnotation({ type: 'ink', color: readerColor, width: 2, points: readerInkDrawing });
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointerup', evt => {
+  if (readerMode === 'highlight' && readerDragStart) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    const rect = rectFrom(readerDragStart, pt);
+    if (rect.w > 2 && rect.h > 2) pushReaderAnnotation({ type: 'highlight', color: readerColor, rect });
+    readerDragStart = null;
+    redrawReaderAnnotations();
+  } else if (readerMode === 'ink' && readerInkDrawing) {
+    if (readerInkDrawing.length > 1) pushReaderAnnotation({ type: 'ink', color: readerColor, width: 2, points: readerInkDrawing });
+    readerInkDrawing = null;
+    redrawReaderAnnotations();
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointerleave', () => {
+  if (readerDragStart || readerInkDrawing) {
+    readerDragStart = null;
+    readerInkDrawing = null;
+    redrawReaderAnnotations();
+  }
+});
+
+// ── Toolbar wiring ─────────────────────────────
+function updateReaderModeButtons() {
+  document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.dataset.mode === readerMode);
+  });
+  readerStage.classList.remove('mode-pan', 'mode-highlight', 'mode-note', 'mode-ink');
+  readerStage.classList.add('mode-' + readerMode);
+}
+
+document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    readerMode = chip.dataset.mode;
+    updateReaderModeButtons();
+  });
+});
+
+document.getElementById('reader-color').addEventListener('input', e => { readerColor = e.target.value; });
+
+document.getElementById('reader-open-btn').addEventListener('click', () => leaveReaderSafely(pickAndOpenReaderPdf));
+document.getElementById('reader-empty-open-btn').addEventListener('click', pickAndOpenReaderPdf);
+document.getElementById('reader-back-btn').addEventListener('click', () => leaveReaderSafely(goHome));
+readerSaveBtn.addEventListener('click', () => saveReaderAnnotations());
+document.getElementById('reader-undo-btn').addEventListener('click', undoReaderLast);
+
+document.getElementById('reader-prev-btn').addEventListener('click', () => goToReaderPage(readerPage - 1));
+document.getElementById('reader-next-btn').addEventListener('click', () => goToReaderPage(readerPage + 1));
+
+readerPageNumInput.addEventListener('change', () => {
+  const n = parseInt(readerPageNumInput.value, 10);
+  if (!Number.isNaN(n)) goToReaderPage(n);
+  else readerPageNumInput.value = String(readerPage);
+});
+
+readerZoomSlider.addEventListener('input', async e => {
+  readerZoomPct = Number(e.target.value);
+  readerDpi = Math.round(96 * (readerZoomPct / 100));
+  readerZoomLabel.textContent = readerZoomPct + '%';
+  await renderReaderPage();
+});
+
+// ── Keyboard shortcuts (only while the reader is the active view) ──
+window.addEventListener('keydown', e => {
+  if (!readerView.classList.contains('active')) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT') return; // don't hijack typing in the page/note inputs
+
+  if (e.key === 'ArrowRight') goToReaderPage(readerPage + 1);
+  if (e.key === 'ArrowLeft') goToReaderPage(readerPage - 1);
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveReaderAnnotations(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoReaderLast(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); leaveReaderSafely(pickAndOpenReaderPdf); }
+});
+
 // ── Global drag-and-drop ──────────────────────
 document.addEventListener('dragenter', e => {
   if (e.dataTransfer.types.includes('Files')) {
@@ -1353,6 +2109,16 @@ document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => {
   e.preventDefault();
   dropOverlay.classList.remove('active');
+
+  if (currentTool && currentTool.isReader) {
+    // The reader keeps a single open document (currentReaderPath), not the
+    // generic multi-file list the other tools use, and — like every other
+    // drop target in this app — a dropped File object never carries a real
+    // filesystem path in a webview, so fall back to the native picker
+    // rather than trying to use it directly.
+    pickAndOpenReaderPdf();
+    return;
+  }
 
   const allFiles = Array.from(e.dataTransfer.files);
   const pdfs   = allFiles.filter(f => f.name.endsWith('.pdf'));

@@ -35,6 +35,12 @@ The OhPDF path: double-click → drop files → done.
 | Images to PDF | Combine PNG / JPG files into a PDF |
 | Add Watermark | Semi-transparent text watermark on every page |
 
+**Phase 2 (Beta)**
+
+| Feature | Description |
+|---------|-------------|
+| Read & Annotate | View a PDF page by page and mark it up with highlights, sticky notes, and freehand ink. Marks are saved to a sidecar `<file>.pdf.ohpdf-annot.json` next to the PDF, not written into it — the original file is never touched, same as every other tool here. |
+
 ---
 
 ## Building
@@ -91,6 +97,8 @@ report.pdf  →  report_merged.pdf
 report.pdf  →  report_compressed.pdf
 ```
 
+Read & Annotate is the one exception: it doesn't produce a new PDF at all. Marks are kept in a sidecar `report.pdf.ohpdf-annot.json` next to the source file, loaded again automatically the next time that file is opened for reading.
+
 ---
 
 ## Architecture
@@ -106,7 +114,7 @@ wry + tao         — native window + system WebView
 ui/index.html     — all UI, single file, no framework, no build step
 ```
 
-**Only 7 dependencies:** `tao` · `wry` · `mupdf` · `serde` · `serde_json` · `tokio` · `rfd`
+**Dependencies:** `tao` · `wry` · `mupdf` · `serde` · `serde_json` · `tempfile` · `anyhow` · `log` · `env_logger` · `rfd` · `base64` · `dirs` — no Node.js, no npm, no frontend build step at any point in the pipeline.
 
 ### Binary Size Target
 
@@ -133,7 +141,7 @@ No installer, no registry writes — delete the binary to uninstall.
 ## Roadmap
 
 - [x] Phase 1: Core PDF operations (MVP)
-- [ ] Phase 2: Annotations, form filling, digital signatures
+- [ ] Phase 2: Annotations (beta — highlight/note/ink, see above), form filling, digital signatures
 - [ ] Phase 3: Localization, keyboard shortcuts
 
 ---
