@@ -1,0 +1,2144 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OhPDF</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ── */
+    :root {
+      --bg:        #0f0f0f;
+      --surface:   #1a1a1a;
+      --surface2:  #242424;
+      --border:    #2e2e2e;
+      --text:      #e8e8e8;
+      --text-dim:  #888;
+      --accent:    #e8e8e8;
+      --accent-bg: #252525;
+      --danger:    #ff5f5f;
+      --success:   #4ade80;
+      --radius:    10px;
+      --radius-sm: 6px;
+      --font:      -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+      --mono:      "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      --ease:      cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Title bar (drag region) ── */
+    #titlebar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #titlebar .wordmark {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      -webkit-app-region: no-drag;
+    }
+
+    /* ── Main ── */
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 28px 24px 24px;
+    }
+    #main.hidden { display: none; }
+
+    /* ── Home screen ── */
+    #home { display: block; }
+    #home .label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .tool-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 16px 14px;
+      cursor: pointer;
+      transition: background 0.12s var(--ease), border-color 0.12s var(--ease), transform 0.1s var(--ease);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .tool-card:hover {
+      background: var(--surface2);
+      border-color: #3e3e3e;
+    }
+    .tool-card:active { transform: scale(0.98); }
+    .tool-card .icon { font-size: 20px; line-height: 1; }
+    .tool-card .name {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .tool-card .hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    /* ── Drop overlay ── */
+    #drop-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 15, 15, 0.88);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      margin: 8px;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    #drop-overlay.active { display: flex; }
+    #drop-overlay .drop-icon { font-size: 40px; opacity: 0.7; }
+    #drop-overlay .drop-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Task view ── */
+    #task-view { display: none; }
+    #task-view.active { display: block; }
+    #home.hidden { display: none; }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      margin-bottom: 20px;
+      padding: 4px 0;
+      border: none;
+      background: none;
+      transition: color 0.1s;
+    }
+    .back-btn:hover { color: var(--text); }
+
+    .task-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 6px;
+    }
+    .task-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    /* ── File drop zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+      margin-bottom: 16px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #555;
+      background: var(--surface);
+    }
+    .drop-zone .dz-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
+    .drop-zone .dz-text { font-size: 13px; color: var(--text-dim); }
+    .drop-zone .dz-hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    /* ── File list ── */
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .file-item .fi-icon { font-size: 16px; flex-shrink: 0; }
+    .file-item .fi-name {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-item .fi-size {
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .file-item .fi-remove {
+      flex-shrink: 0;
+      cursor: pointer;
+      font-size: 14px;
+      color: #555;
+      border: none;
+      background: none;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.1s;
+    }
+    .file-item .fi-remove:hover { color: var(--danger); }
+
+    /* Drag-to-reorder handle */
+    .file-item .fi-drag {
+      cursor: grab;
+      color: #444;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .file-item.dragging { opacity: 0.4; }
+
+    /* Small inline thumbnail used in the reorder list rows. */
+    .fi-thumb-wrap {
+      width: 32px;
+      height: 40px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .fi-thumb-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .fi-thumb-wrap.pc-loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #222 37%, #1a1a1a 63%);
+      background-size: 400% 100%;
+      animation: pc-shimmer 1.4s ease infinite;
+    }
+
+    /* ── Controls ── */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+    .field-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      padding: 9px 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.12s;
+      font-family: var(--font);
+    }
+    .field-input:focus { border-color: #555; }
+    .field-input[type="password"] { letter-spacing: 0.1em; }
+    .field-input[type="range"] {
+      padding: 0;
+      cursor: pointer;
+      accent-color: var(--text);
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .range-val {
+      font-size: 12px;
+      color: var(--text-dim);
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Page picker ── */
+    .page-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 2px;
+    }
+    .page-chip {
+      width: 84px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 5px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      background: var(--surface);
+      color: var(--text-dim);
+    }
+    .page-chip .pc-thumb-wrap {
+      width: 100%;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .page-chip .pc-thumb {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      /* Real page previews, not stretched to fill — keeps them readable
+         without ballooning to full size. */
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .page-chip .pc-num {
+      font-size: 11px;
+      line-height: 1;
+      padding-top: 1px;
+    }
+    .page-chip:hover { border-color: #555; color: var(--text); }
+    .page-chip.selected {
+      background: var(--text);
+      border-color: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+    .page-chip.selected .pc-thumb-wrap { box-shadow: 0 0 0 2px var(--bg) inset; }
+    /* Skeleton shown while a thumbnail is still rendering. */
+    .pc-thumb-wrap.pc-loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #222 37%, #1a1a1a 63%);
+      background-size: 400% 100%;
+      animation: pc-shimmer 1.4s ease infinite;
+    }
+    @keyframes pc-shimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0 50%; }
+    }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 11px 20px;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: opacity 0.1s, transform 0.1s var(--ease);
+      font-family: var(--font);
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+      pointer-events: none;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 80vw;
+    }
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #toast.success .toast-icon::before { content: "✓"; color: var(--success); }
+    #toast.error   .toast-icon::before { content: "✕"; color: var(--danger); }
+    #toast.info    .toast-icon::before { content: "↗"; color: var(--text-dim); }
+
+    /* ── Rotate picker ── */
+    .rotate-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .rotate-chip {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      background: var(--surface);
+      color: var(--text-dim);
+      transition: all 0.1s;
+    }
+    .rotate-chip:hover { border-color: #555; color: var(--text); }
+    .rotate-chip.selected {
+      background: var(--text);
+      border-color: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    /* ── Progress state ── */
+    .btn-primary.running {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Reveal link ── */
+    .reveal-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-dim);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      background: none;
+      border: none;
+    }
+    .reveal-link:hover { color: var(--text); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Reader view (Read & Annotate) ──────────
+       Uses the same tokens as the rest of the app (--bg/--surface/--border/
+       --text/--radius/--mono/…) rather than a separate palette, and reuses
+       .rotate-options/.rotate-chip (already styled for the Rotate-Pages
+       and Watermark-rotation pickers) for the mode selector below, so it
+       looks like a native part of OhPDF rather than an imported widget. ── */
+    #reader-view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    #reader-view.active { display: flex; }
+
+    .reader-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .reader-toolbar .back-btn { margin-bottom: 0; }
+    .reader-toolbar-controls {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .reader-toolbar-controls.visible { display: flex; }
+    .reader-toolbar-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      margin: 0 2px;
+    }
+    .reader-toolbar-spacer { flex: 1; }
+    .reader-doc-title {
+      font-size: 12px;
+      color: var(--text-dim);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .reader-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font);
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+    .reader-btn:hover { border-color: #555; color: var(--text); }
+
+    .dirty-dot {
+      display: none;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text);
+    }
+    #reader-save-btn.dirty .dirty-dot { display: inline-block; }
+
+    .reader-color-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .reader-color-swatch input[type="color"] {
+      position: absolute;
+      inset: -4px;
+      width: calc(100% + 8px);
+      height: calc(100% + 8px);
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0;
+    }
+
+    .reader-stage {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 28px 24px;
+    }
+
+    .reader-empty {
+      display: none;
+      position: absolute;
+      inset: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    .reader-empty.visible { display: flex; }
+    .reader-empty .re-icon { font-size: 40px; opacity: 0.6; }
+    .reader-empty p { font-size: 13px; max-width: 280px; }
+    .reader-empty-btn { width: auto !important; padding-left: 24px; padding-right: 24px; }
+
+    .reader-page-wrap { display: none; justify-content: center; }
+    .reader-page-wrap.visible { display: flex; }
+    .reader-page-shadow {
+      position: relative;
+      line-height: 0;
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+    #reader-page-canvas, #reader-annot-canvas { display: block; }
+    #reader-annot-canvas { position: absolute; top: 0; left: 0; }
+    .reader-stage.mode-highlight #reader-annot-canvas,
+    .reader-stage.mode-ink #reader-annot-canvas { cursor: crosshair; }
+    .reader-stage.mode-note #reader-annot-canvas { cursor: copy; }
+
+    .reader-note-popup {
+      position: fixed;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 6px 6px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      z-index: 250;
+    }
+    .reader-note-popup.visible { display: flex; }
+    .reader-note-popup input {
+      width: 200px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font);
+    }
+    .reader-note-popup button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    .reader-note-popup button:hover { color: var(--text); background: var(--surface); }
+
+    .reader-statusbar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .reader-statusbar.visible { display: flex; }
+    .reader-page-nav { display: flex; align-items: center; gap: 8px; }
+    .reader-icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .reader-icon-btn:hover:not(:disabled) { border-color: #555; }
+    .reader-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .reader-page-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .reader-page-indicator input {
+      width: 34px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font: inherit;
+      padding: 3px 2px;
+    }
+    .reader-zoom { display: flex; align-items: center; gap: 8px; }
+    .reader-zoom input[type="range"] { width: 120px; accent-color: var(--text); }
+    .reader-zoom-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      width: 34px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Title bar -->
+  <div id="titlebar">
+    <span class="wordmark">OhPDF</span>
+  </div>
+
+  <!-- Global drop overlay -->
+  <div id="drop-overlay">
+    <div class="drop-icon">📄</div>
+    <div class="drop-text">Drop files to get started</div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main">
+
+    <!-- Home screen -->
+    <div id="home">
+      <div class="label">What would you like to do?</div>
+      <div class="grid" id="tool-grid"></div>
+    </div>
+
+    <!-- Task view (shown when user picks a tool) -->
+    <div id="task-view">
+      <button class="back-btn" id="back-btn">
+        ← Back
+      </button>
+      <div class="task-title" id="task-title"></div>
+      <div class="task-desc" id="task-desc"></div>
+      <div id="task-body"></div>
+    </div>
+
+  </div>
+
+  <!-- Reader view (Read & Annotate) -->
+  <div id="reader-view">
+    <div class="reader-toolbar">
+      <button class="back-btn" id="reader-back-btn">← Back</button>
+
+      <div class="reader-toolbar-controls" id="reader-controls">
+        <div class="reader-toolbar-divider"></div>
+        <button class="reader-btn" id="reader-open-btn" title="Open a different PDF (Ctrl/Cmd+O)">Open</button>
+        <div class="rotate-options" id="reader-mode-group">
+          <div class="rotate-chip selected" data-mode="pan">Pan</div>
+          <div class="rotate-chip" data-mode="highlight">Highlight</div>
+          <div class="rotate-chip" data-mode="note">Note</div>
+          <div class="rotate-chip" data-mode="ink">Draw</div>
+        </div>
+        <label class="reader-color-swatch" title="Annotation color">
+          <input type="color" id="reader-color" value="#f2c40c" />
+        </label>
+        <button class="reader-btn" id="reader-undo-btn" title="Undo last mark on this page (Ctrl/Cmd+Z)">Undo</button>
+        <button class="reader-btn" id="reader-save-btn" title="Save annotations (Ctrl/Cmd+S)">
+          Save <i class="dirty-dot" id="reader-dirty-dot"></i>
+        </button>
+      </div>
+
+      <div class="reader-toolbar-spacer"></div>
+      <span class="reader-doc-title" id="reader-doc-title"></span>
+    </div>
+
+    <div class="reader-stage mode-pan" id="reader-stage">
+      <div class="reader-empty visible" id="reader-empty">
+        <div class="re-icon">📖</div>
+        <p>Open a PDF to read, highlight, add sticky notes, and draw on it.</p>
+        <button class="btn-primary reader-empty-btn" id="reader-empty-open-btn">Choose PDF File</button>
+      </div>
+
+      <div class="reader-page-wrap" id="reader-page-wrap">
+        <div class="reader-page-shadow">
+          <canvas id="reader-page-canvas"></canvas>
+          <canvas id="reader-annot-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky-note text input popup -->
+    <div class="reader-note-popup" id="reader-note-popup">
+      <input id="reader-note-input" type="text" placeholder="Note text…" />
+      <button id="reader-note-ok" title="Add">✓</button>
+      <button id="reader-note-cancel" title="Cancel">✕</button>
+    </div>
+
+    <div class="reader-statusbar" id="reader-statusbar">
+      <div class="reader-page-nav">
+        <button class="reader-icon-btn" id="reader-prev-btn" title="Previous page (←)">‹</button>
+        <span class="reader-page-indicator">
+          <input id="reader-page-num" type="text" inputmode="numeric" value="0" />
+          <span>/</span>
+          <span id="reader-page-total">0</span>
+        </span>
+        <button class="reader-icon-btn" id="reader-next-btn" title="Next page (→)">›</button>
+      </div>
+      <div class="reader-zoom">
+        <input id="reader-zoom" type="range" min="50" max="300" step="10" value="100" />
+        <span class="reader-zoom-label" id="reader-zoom-label">100%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
+
+<script>
+/* ────────────────────────────────────────────────
+   OhPDF — UI Logic (vanilla JS, no build step)
+   ──────────────────────────────────────────────── */
+
+// ── Tool definitions ──────────────────────────
+const TOOLS = [
+  {
+    id: 'merge',
+    icon: '⊕',
+    name: 'Merge PDFs',
+    hint: 'Combine multiple files into one',
+    desc: 'Merge multiple PDF files into one, in the order they were added.',
+    multi: true,
+  },
+  {
+    id: 'split',
+    icon: '⊘',
+    name: 'Split PDF',
+    hint: 'Split by page ranges',
+    desc: 'Split a PDF into multiple files by page range.',
+    multi: false,
+  },
+  {
+    id: 'compress',
+    icon: '◉',
+    name: 'Compress PDF',
+    hint: 'Reduce file size',
+    desc: 'Optimize PDF size for easier sharing or storage.',
+    multi: false,
+  },
+  {
+    id: 'encrypt',
+    icon: '⊛',
+    name: 'Encrypt PDF',
+    hint: 'Set an open password',
+    desc: 'Add password protection so only those with the password can open the file.',
+    multi: false,
+  },
+  {
+    id: 'decrypt',
+    icon: '⊖',
+    name: 'Decrypt PDF',
+    hint: 'Remove existing password',
+    desc: 'Remove password protection from a PDF by entering the correct password.',
+    multi: false,
+  },
+  {
+    id: 'delete-pages',
+    icon: '⊟',
+    name: 'Delete Pages',
+    hint: 'Remove unwanted pages',
+    desc: 'Delete specific pages from a PDF.',
+    multi: false,
+    needsPagePick: true,
+  },
+  {
+    id: 'extract-pages',
+    icon: '⊞',
+    name: 'Extract Pages',
+    hint: 'Save selected pages as a new file',
+    desc: 'Extract selected pages into a new PDF file.',
+    multi: false,
+    needsPagePick: true,
+  },
+  {
+    id: 'rotate-pages',
+    icon: '↻',
+    name: 'Rotate Pages',
+    hint: 'Rotate specific pages',
+    desc: 'Choose pages to rotate and the rotation angle.',
+    multi: false,
+    needsPagePick: true,
+    needsRotate: true,
+  },
+  {
+    id: 'reorder-pages',
+    icon: '⇅',
+    name: 'Reorder Pages',
+    hint: 'Drag to rearrange page order',
+    desc: 'Drag and drop to rearrange the page order of a PDF.',
+    multi: false,
+    needsReorder: true,
+  },
+  {
+    id: 'pdf-to-images',
+    icon: '🖼',
+    name: 'PDF to Images',
+    hint: 'Export each page as a PNG',
+    desc: 'Render each PDF page as a PNG image, saved next to the source file.',
+    multi: false,
+  },
+  {
+    id: 'images-to-pdf',
+    icon: '📑',
+    name: 'Images to PDF',
+    hint: 'Combine images into a PDF',
+    desc: 'Combine multiple PNG / JPG images into a single PDF, one image per page.',
+    multi: true,
+    acceptImages: true,
+  },
+  {
+    id: 'watermark',
+    icon: '◈',
+    name: 'Add Watermark',
+    hint: 'Overlay text watermark on every page',
+    desc: 'Add a semi-transparent text watermark to every page, e.g. Confidential or Draft.',
+    multi: false,
+  },
+  {
+    id: 'read',
+    icon: '📖',
+    name: 'Read & Annotate',
+    hint: 'View pages, highlight, and mark up',
+    desc: 'Open a PDF to read, highlight, add sticky notes, and draw on it. Marks are saved next to the file, not into it.',
+    isReader: true,
+  },
+];
+
+// ── State ─────────────────────────────────────
+let currentTool = null;
+let files = [];        // File objects
+let pageCount = 0;
+// Map<pageNumber, dataUrl> — populated once thumbnails come back from Rust,
+// and read by both renderPageChips() and renderReorderItems() so a single
+// render pass is shared between the delete-pages and reorder-pages pickers.
+let pageThumbnails = new Map();
+let selectedPages = new Set();
+let reorderOrder = [];  // 1-indexed
+let splitRanges = [];
+
+// ── DOM refs ──────────────────────────────────
+const mainEl     = document.getElementById('main');
+const home       = document.getElementById('home');
+const taskView   = document.getElementById('task-view');
+const taskTitle  = document.getElementById('task-title');
+const taskDesc   = document.getElementById('task-desc');
+const taskBody   = document.getElementById('task-body');
+const backBtn    = document.getElementById('back-btn');
+const toolGrid   = document.getElementById('tool-grid');
+const dropOverlay = document.getElementById('drop-overlay');
+const readerView = document.getElementById('reader-view');
+
+// ── Render home grid ──────────────────────────
+function renderHome() {
+  toolGrid.innerHTML = '';
+  TOOLS.forEach(tool => {
+    const card = document.createElement('div');
+    card.className = 'tool-card';
+    card.innerHTML = `
+      <div class="icon">${tool.icon}</div>
+      <div class="name">${tool.name}</div>
+      <div class="hint">${tool.hint}</div>
+    `;
+    card.addEventListener('click', () => openTool(tool.id));
+    toolGrid.appendChild(card);
+  });
+}
+renderHome();
+
+// ── Navigation ────────────────────────────────
+function openTool(id, droppedFiles) {
+  currentTool = TOOLS.find(t => t.id === id);
+  if (!currentTool) return;
+
+  if (currentTool.isReader) {
+    mainEl.classList.add('hidden');
+    readerView.classList.add('active');
+    openReader();
+    return;
+  }
+
+  files = droppedFiles ? Array.from(droppedFiles) : [];
+  selectedPages = new Set();
+  reorderOrder = [];
+  splitRanges = [];
+  pageCount = 0;
+  pageThumbnails = new Map();
+
+  home.classList.add('hidden');
+  taskView.classList.add('active');
+  taskTitle.textContent = currentTool.name;
+  taskDesc.textContent  = currentTool.desc;
+
+  renderTask();
+}
+
+backBtn.addEventListener('click', goHome);
+
+function goHome() {
+  currentTool = null;
+  files = [];
+  mainEl.classList.remove('hidden');
+  readerView.classList.remove('active');
+  home.classList.remove('hidden');
+  taskView.classList.remove('active');
+  taskBody.innerHTML = '';
+}
+
+// ── Task renderer ─────────────────────────────
+function renderTask() {
+  taskBody.innerHTML = '';
+
+  // File drop zone
+  if (currentTool.multi || files.length === 0) {
+    taskBody.appendChild(makeDropZone());
+  }
+
+  // File list
+  const fileListEl = document.createElement('div');
+  fileListEl.className = 'file-list';
+  fileListEl.id = 'file-list';
+  taskBody.appendChild(fileListEl);
+  renderFileList();
+
+  // Tool-specific controls
+  if (currentTool.id === 'compress') {
+    taskBody.appendChild(makeCompressControls());
+  }
+  if (currentTool.id === 'encrypt') {
+    taskBody.appendChild(makePasswordField('encrypt-pwd', 'Set password'));
+  }
+  if (currentTool.id === 'decrypt') {
+    taskBody.appendChild(makePasswordField('decrypt-pwd', 'Enter existing password'));
+  }
+  if (currentTool.id === 'split') {
+    taskBody.appendChild(makeSplitControls());
+  }
+  if (currentTool.needsPagePick) {
+    taskBody.appendChild(makePagePicker());
+  }
+  if (currentTool.needsRotate) {
+    taskBody.appendChild(makeRotatePicker());
+  }
+  if (currentTool.needsReorder) {
+    taskBody.appendChild(makeReorderList());
+  }
+  if (currentTool.id === 'pdf-to-images') {
+    taskBody.appendChild(makeDpiControls());
+  }
+  if (currentTool.id === 'watermark') {
+    taskBody.appendChild(makeWatermarkControls());
+  }
+
+  // Execute button
+  const runBtn = document.createElement('button');
+  runBtn.className = 'btn-primary';
+  runBtn.id = 'run-btn';
+  runBtn.textContent = 'Run';
+  runBtn.addEventListener('click', execute);
+  taskBody.appendChild(runBtn);
+}
+
+// ── Drop zone ─────────────────────────────────
+function makeDropZone() {
+  const zone = document.createElement('div');
+  zone.className = 'drop-zone';
+  const isImg = !!currentTool.acceptImages;
+  const hint = currentTool.multi
+    ? (isImg ? 'Click to select images' : 'Click to select PDF files')
+    : 'Click to select a PDF file';
+  const subhint = isImg
+    ? 'Supports PNG / JPG / WebP — processed locally'
+    : 'Files are processed locally — nothing is uploaded to any server';
+  zone.innerHTML = `
+    <div class="dz-icon">${isImg ? '🖼' : '📄'}</div>
+    <div class="dz-text">${hint}</div>
+    <div class="dz-hint">${subhint}</div>
+  `;
+
+  // Click to pick file(s) via the native OS file dialog.
+  //
+  // NOTE: we intentionally do NOT use `<input type="file">` here. A browser
+  // `File` object never exposes a real filesystem path (WebView2 / WKWebView
+  // / WebKitGTK all withhold it for security reasons), so the old code's
+  // `files[0].path` was always `undefined` and every operation below either
+  // silently no-op'd (page count never fetched) or got sent a bare filename
+  // with no directory. Going through Rust's native dialog (`rfd`) gives us
+  // a real absolute path every time.
+  zone.addEventListener('click', () => pickFilesNative());
+
+  // Drag-and-drop from the OS cannot reliably yield real paths in a
+  // generic webview either, so a drop just opens the same native dialog
+  // as a graceful fallback rather than trusting `dataTransfer.files`.
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    pickFilesNative();
+  });
+
+  return zone;
+}
+
+function pickFilesNative() {
+  const isImg = !!currentTool.acceptImages;
+  sendIpc({
+    action: 'pick_files',
+    kind: isImg ? 'image' : 'pdf',
+    multiple: !!currentTool.multi,
+  }).then(res => {
+    if (res.status === 'paths' && res.paths && res.paths.length) {
+      const picked = res.paths.map(p => ({
+        path: p,
+        name: p.split(/[\\/]/).pop(),
+      }));
+      addFiles(picked);
+    }
+  }).catch(err => toast('error', String(err)));
+}
+
+function addFiles(newFiles) {
+  if (!currentTool.multi) {
+    files = newFiles.slice(0, 1);
+  } else {
+    files = [...files, ...newFiles];
+  }
+  renderFileList();
+  afterFilesChange();
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  if (!el) return;
+  el.innerHTML = '';
+  files.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    const isReorder = currentTool.needsReorder;
+    item.innerHTML = `
+      ${isReorder ? '<span class="fi-drag" title="Drag to reorder">⠿</span>' : ''}
+      <span class="fi-icon">📄</span>
+      <span class="fi-name" title="${f.path || f.name}">${f.name}</span>
+      <button class="fi-remove" data-idx="${i}" title="Remove">✕</button>
+    `;
+    item.querySelector('.fi-remove').addEventListener('click', e => {
+      const idx = parseInt(e.currentTarget.dataset.idx, 10);
+      files.splice(idx, 1);
+      renderFileList();
+      afterFilesChange();
+    });
+    el.appendChild(item);
+  });
+}
+
+function afterFilesChange() {
+  if (files.length === 0 || !files[0].path) return;
+
+  if (currentTool.needsPagePick || currentTool.needsReorder) {
+    const path = files[0].path;
+    // Ask Rust for page count first so the grid/list can render immediately
+    // (with loading-skeleton thumbnails), rather than waiting on rendering
+    // to finish before showing anything.
+    sendIpc({ action: 'get_page_count', path })
+      .then(res => {
+        if (res.status !== 'page_count') return;
+        pageCount = res.count;
+        if (currentTool.needsPagePick) renderPageChips();
+        if (currentTool.needsReorder)  renderReorderItems();
+
+        // Now fetch the actual page previews and swap them in once ready.
+        return sendIpc({ action: 'get_page_thumbnails', path });
+      })
+      .then(res => {
+        if (!res || res.status !== 'thumbnails') return;
+        pageThumbnails = new Map(res.pages.map(p => [p.page, p.data_url]));
+        if (currentTool.needsPagePick) renderPageChips();
+        if (currentTool.needsReorder)  renderReorderItems();
+      });
+  }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Compress controls ─────────────────────────
+function makeCompressControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label">Image Quality</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="quality-slider" min="10" max="100" value="75" step="5" />
+      <span class="range-val" id="quality-val">75</span>
+    </div>
+  `;
+  wrap.querySelector('#quality-slider').addEventListener('input', e => {
+    wrap.querySelector('#quality-val').textContent = e.target.value;
+  });
+  return wrap;
+}
+
+// ── Password field ────────────────────────────
+function makePasswordField(id, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label" for="${id}">${label}</label>
+    <input class="field-input" type="password" id="${id}" placeholder="••••••••" autocomplete="off" />
+  `;
+  return wrap;
+}
+
+// ── Split controls ────────────────────────────
+let splitRangeCount = 1;
+
+function makeSplitControls() {
+  const wrap = document.createElement('div');
+  wrap.id = 'split-wrap';
+  wrap.className = 'field-group';
+  wrap.innerHTML = '<label class="field-label">Split Ranges (page numbers, starting at 1)</label>';
+  renderSplitRows(wrap);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-primary';
+  addBtn.style.cssText = 'background:var(--surface);color:var(--text);border:1px solid var(--border);margin-top:6px;';
+  addBtn.textContent = '+ Add Range';
+  addBtn.addEventListener('click', () => {
+    splitRangeCount++;
+    renderSplitRows(wrap);
+  });
+  wrap.appendChild(addBtn);
+  return wrap;
+}
+
+function renderSplitRows(wrap) {
+  const existing = wrap.querySelectorAll('.split-row');
+  existing.forEach(el => el.remove());
+
+  for (let i = 0; i < splitRangeCount; i++) {
+    const row = document.createElement('div');
+    row.className = 'split-row range-row';
+    row.style.marginBottom = '6px';
+    row.innerHTML = `
+      <input class="field-input" type="number" placeholder="Start page" min="1" style="width:50%" id="split-start-${i}" />
+      <span style="color:var(--text-dim);padding:0 4px;">—</span>
+      <input class="field-input" type="number" placeholder="End page" min="1" style="width:50%" id="split-end-${i}" />
+    `;
+    wrap.appendChild(row);
+  }
+}
+
+// ── Page picker ───────────────────────────────
+function makePagePicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'page-picker-wrap';
+  wrap.innerHTML = `<label class="field-label">Select Pages (shown after file loads)</label>
+    <div class="page-grid" id="page-grid"></div>`;
+  return wrap;
+}
+
+function renderPageChips() {
+  const grid = document.getElementById('page-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  // Keep prior selections across re-renders (e.g. when thumbnails arrive
+  // after the initial skeleton render) instead of wiping them out.
+  const keepSelected = new Set(selectedPages);
+  selectedPages = new Set();
+
+  for (let i = 1; i <= pageCount; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'page-chip';
+    chip.dataset.page = i;
+
+    const dataUrl = pageThumbnails.get(i);
+    chip.innerHTML = `
+      <div class="pc-thumb-wrap${dataUrl ? '' : ' pc-loading'}">
+        ${dataUrl ? `<img class="pc-thumb" src="${dataUrl}" alt="Page ${i}" />` : ''}
+      </div>
+      <span class="pc-num">${i}</span>
+    `;
+
+    if (keepSelected.has(i)) {
+      selectedPages.add(i);
+      chip.classList.add('selected');
+    }
+
+    chip.addEventListener('click', () => {
+      const p = parseInt(chip.dataset.page, 10);
+      if (selectedPages.has(p)) {
+        selectedPages.delete(p);
+        chip.classList.remove('selected');
+      } else {
+        selectedPages.add(p);
+        chip.classList.add('selected');
+      }
+    });
+    grid.appendChild(chip);
+  }
+}
+
+// ── Rotate picker ─────────────────────────────
+function makeRotatePicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'rotate-picker-wrap';
+  wrap.innerHTML = `<label class="field-label">Rotation</label>
+    <div class="rotate-options">
+      <div class="rotate-chip selected" data-deg="90">90° Clockwise</div>
+      <div class="rotate-chip" data-deg="180">180°</div>
+      <div class="rotate-chip" data-deg="270">90° Counter-clockwise</div>
+    </div>`;
+  wrap.querySelectorAll('.rotate-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      wrap.querySelectorAll('.rotate-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+  return wrap;
+}
+
+function getSelectedDegrees() {
+  const chip = taskBody.querySelector('.rotate-chip.selected');
+  return chip ? parseInt(chip.dataset.deg, 10) : 90;
+}
+
+// ── Reorder list ──────────────────────────────
+function makeReorderList() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'reorder-wrap';
+  wrap.innerHTML = `<label class="field-label">Drag to Reorder Pages (shown after file loads)</label>
+    <div class="file-list" id="reorder-list"></div>`;
+  return wrap;
+}
+
+function renderReorderItems() {
+  const list = document.getElementById('reorder-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Initialize order if needed
+  if (reorderOrder.length !== pageCount) {
+    reorderOrder = Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
+
+  reorderOrder.forEach((pageNum, listIdx) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.draggable = true;
+    item.dataset.listIdx = listIdx;
+
+    const dataUrl = pageThumbnails.get(pageNum);
+    item.innerHTML = `
+      <span class="fi-drag">⠿</span>
+      <div class="fi-thumb-wrap${dataUrl ? '' : ' pc-loading'}">
+        ${dataUrl ? `<img src="${dataUrl}" alt="Page ${pageNum}" />` : ''}
+      </div>
+      <span class="fi-name">Page ${pageNum}</span>
+    `;
+    // Drag-and-drop reorder
+    item.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', listIdx);
+      item.classList.add('dragging');
+    });
+    item.addEventListener('dragend', () => item.classList.remove('dragging'));
+    item.addEventListener('dragover', e => { e.preventDefault(); });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const to   = parseInt(item.dataset.listIdx, 10);
+      if (from !== to) {
+        const moved = reorderOrder.splice(from, 1)[0];
+        reorderOrder.splice(to, 0, moved);
+        renderReorderItems();
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+// ── DPI controls (PDF to images) ──────────────
+function makeDpiControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label">Output Resolution (DPI)</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="dpi-slider" min="72" max="300" value="150" step="6" />
+      <span class="range-val" id="dpi-val">150</span>
+    </div>
+    <div class="field-label" style="margin-top:4px;font-size:11px;color:#555">
+      72 = Screen preview &nbsp;·&nbsp; 150 = Standard print &nbsp;·&nbsp; 300 = High-res print
+    </div>
+  `;
+  wrap.querySelector('#dpi-slider').addEventListener('input', e => {
+    wrap.querySelector('#dpi-val').textContent = e.target.value;
+  });
+  return wrap;
+}
+
+// ── Watermark controls ─────────────────────────
+function makeWatermarkControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.innerHTML = `
+    <label class="field-label" for="wm-text">Watermark Text</label>
+    <input class="field-input" type="text" id="wm-text" placeholder="e.g. Confidential / Draft / DO NOT COPY" maxlength="40" />
+
+    <label class="field-label" style="margin-top:12px">Font Size</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="wm-size" min="20" max="120" value="60" step="4" />
+      <span class="range-val" id="wm-size-val">60</span>
+    </div>
+
+    <label class="field-label" style="margin-top:12px">Opacity</label>
+    <div class="range-row">
+      <input class="field-input" type="range" id="wm-opacity" min="5" max="60" value="15" step="1" />
+      <span class="range-val" id="wm-opacity-val">15%</span>
+    </div>
+
+    <label class="field-label" style="margin-top:12px">Rotation</label>
+    <div class="rotate-options" id="wm-rotation-opts">
+      <div class="rotate-chip" data-deg="0">Horizontal</div>
+      <div class="rotate-chip selected" data-deg="45">45°</div>
+      <div class="rotate-chip" data-deg="90">Vertical</div>
+    </div>
+  `;
+
+  wrap.querySelector('#wm-size').addEventListener('input', e => {
+    wrap.querySelector('#wm-size-val').textContent = e.target.value;
+  });
+  wrap.querySelector('#wm-opacity').addEventListener('input', e => {
+    wrap.querySelector('#wm-opacity-val').textContent = e.target.value + '%';
+  });
+  wrap.querySelectorAll('#wm-rotation-opts .rotate-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      wrap.querySelectorAll('#wm-rotation-opts .rotate-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+
+  return wrap;
+}
+
+
+// ── IPC ───────────────────────────────────────
+// Pending requests keyed by id, so that responses (delivered once, globally,
+// via window.__ipc_cb) get routed back to the right Promise even if two
+// calls happen to overlap. The callback is installed once, not per-call.
+const pendingIpc = new Map();
+window.__ipc_cb = (data) => {
+  const { id, ...rest } = data || {};
+  const entry = pendingIpc.get(id);
+  if (entry) {
+    pendingIpc.delete(id);
+    entry.resolve(rest);
+  }
+};
+
+function sendIpc(msg) {
+  return new Promise((resolve, reject) => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    pendingIpc.set(id, { resolve, reject });
+    const payload = { id, ...msg };
+    try {
+      window.ipc.postMessage(JSON.stringify(payload));
+    } catch (e) {
+      // Dev mode fallback (browser preview, no wry ipc bridge present)
+      console.log('[IPC send]', payload);
+      pendingIpc.delete(id);
+      setTimeout(() => resolve({ status: 'ok', output: '/tmp/output.pdf', message: '(Simulated success)' }), 600);
+    }
+  });
+}
+
+// ── Execute ───────────────────────────────────
+async function execute() {
+  if (!validateInput()) return;
+
+  const runBtn = document.getElementById('run-btn');
+  runBtn.classList.add('running');
+  runBtn.innerHTML = '<span class="spinner"></span> Processing…';
+
+  try {
+    const result = await buildAndSend();
+    runBtn.classList.remove('running');
+
+    if (result.status === 'ok') {
+      toast('success', result.message || 'Done!', result.output);
+      runBtn.textContent = '✓ Done';
+    } else {
+      // If `result.message` is ever empty, dump the raw response instead of
+      // silently showing a useless generic string — that gap is exactly
+      // what made earlier failures impossible to diagnose from the UI.
+      toast('error', result.message || `Operation failed. (raw: ${JSON.stringify(result)})`);
+      runBtn.textContent = 'Run';
+    }
+  } catch (err) {
+    runBtn.classList.remove('running');
+    runBtn.textContent = 'Run';
+    toast('error', String(err));
+  }
+}
+
+function validateInput() {
+  if (files.length === 0) {
+    toast('error', 'Please select a PDF file first.');
+    return false;
+  }
+  if (currentTool.id === 'merge' && files.length < 2) {
+    toast('error', 'Merge requires at least 2 files.');
+    return false;
+  }
+  if (currentTool.needsPagePick && selectedPages.size === 0) {
+    toast('error', 'Please select at least one page.');
+    return false;
+  }
+  return true;
+}
+
+async function buildAndSend() {
+  const path  = files[0]?.path || files[0]?.name;
+  const paths = files.map(f => f.path || f.name);
+
+  switch (currentTool.id) {
+    case 'merge':
+      return sendIpc({ action: 'merge', paths });
+
+    case 'split': {
+      const ranges = [];
+      for (let i = 0; i < splitRangeCount; i++) {
+        const s = parseInt(document.getElementById(`split-start-${i}`)?.value, 10);
+        const e = parseInt(document.getElementById(`split-end-${i}`)?.value, 10);
+        if (!isNaN(s) && !isNaN(e)) ranges.push({ start: s, end: e });
+      }
+      if (ranges.length === 0) {
+        toast('error', 'Please add at least one split range.');
+        return { status: 'error' };
+      }
+      return sendIpc({ action: 'split', path, ranges });
+    }
+
+    case 'compress': {
+      const q = parseInt(document.getElementById('quality-slider')?.value || '75', 10);
+      return sendIpc({ action: 'compress', path, quality: q });
+    }
+
+    case 'encrypt': {
+      const pwd = document.getElementById('encrypt-pwd')?.value;
+      if (!pwd) { toast('error', 'Please enter a password.'); return { status: 'error' }; }
+      return sendIpc({ action: 'encrypt', path, password: pwd });
+    }
+
+    case 'decrypt': {
+      const pwd = document.getElementById('decrypt-pwd')?.value;
+      if (!pwd) { toast('error', 'Please enter the existing password.'); return { status: 'error' }; }
+      return sendIpc({ action: 'decrypt', path, password: pwd });
+    }
+
+    case 'delete-pages':
+      return sendIpc({ action: 'delete_pages', path, pages: [...selectedPages] });
+
+    case 'extract-pages':
+      return sendIpc({ action: 'extract_pages', path, pages: [...selectedPages] });
+
+    case 'rotate-pages':
+      return sendIpc({ action: 'rotate_pages', path, pages: [...selectedPages], degrees: getSelectedDegrees() });
+
+    case 'reorder-pages':
+      return sendIpc({ action: 'reorder_pages', path, order: reorderOrder });
+
+    case 'pdf-to-images': {
+      const dpi = parseInt(document.getElementById('dpi-slider')?.value || '150', 10);
+      return sendIpc({ action: 'pdf_to_images', path, dpi });
+    }
+
+    case 'images-to-pdf': {
+      const firstName = files[0]?.name || 'images';
+      const stem = firstName.replace(/\.[^.]+$/, '');
+      return sendIpc({ action: 'images_to_pdf', paths, output_name: `${stem}_combined.pdf` });
+    }
+
+    case 'watermark': {
+      const text = document.getElementById('wm-text')?.value?.trim();
+      if (!text) { toast('error', 'Please enter watermark text.'); return { status: 'error' }; }
+      const fontSize = parseFloat(document.getElementById('wm-size')?.value || '60');
+      const opacityPct = parseFloat(document.getElementById('wm-opacity')?.value || '15');
+      const rotChip = taskBody.querySelector('#wm-rotation-opts .rotate-chip.selected');
+      const rotation = rotChip ? parseFloat(rotChip.dataset.deg) : 45;
+      return sendIpc({
+        action: 'add_watermark',
+        path,
+        text,
+        font_size: fontSize,
+        opacity: opacityPct / 100,
+        rotation,
+      });
+    }
+
+    default:
+      return { status: 'error', message: 'Unknown tool.' };
+  }
+}
+
+// ── Toast ─────────────────────────────────────
+let toastTimer;
+function toast(type, message, outputPath) {
+  const el  = document.getElementById('toast');
+  const msg = document.getElementById('toast-msg');
+
+  el.className = `${type}`;
+  if (outputPath) {
+    msg.innerHTML = `${message} <button class="reveal-link" onclick="revealFile('${outputPath}')">Show in Folder ↗</button>`;
+  } else {
+    msg.textContent = message;
+  }
+
+  el.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), 4000);
+}
+
+function revealFile(path) {
+  sendIpc({ action: 'reveal_in_finder', path });
+}
+
+// ── Reader (Read & Annotate) ───────────────────
+// Ported from a standalone prototype onto this file's existing sendIpc()/
+// toast() plumbing instead of a separate frontend + IPC bridge, so it's one
+// more view in the same single-file app rather than a second application.
+// All state here is kept separate from the generic task-flow state above
+// (files/pageCount/selectedPages/...) since the reader manages one open
+// document at a time rather than a list of files to process.
+
+let readerPath = null;
+let readerPage = 1;             // 1-indexed, matching every other page
+                                 // number this app exposes (thumbnails,
+                                 // rotate, etc.) — unlike PDF.js-style
+                                 // viewers, there's no 0-indexed page here.
+let readerPageCount = 0;
+let readerZoomPct = 100;
+let readerDpi = 96;              // 96dpi = 100% zoom (1 CSS px per PDF pt)
+let readerMode = 'pan';          // pan | highlight | note | ink
+let readerColor = '#f2c40c';
+let readerAnnotations = {};      // { "1": [ {type,...}, ... ], ... }
+let readerDragStart = null;      // in-progress highlight rect (PDF pt space)
+let readerInkDrawing = null;     // in-progress ink stroke (array of PDF pt points)
+let readerDirty = false;
+let readerNotePopupResolver = null;
+
+const readerControls    = document.getElementById('reader-controls');
+const readerDocTitleEl  = document.getElementById('reader-doc-title');
+const readerStage       = document.getElementById('reader-stage');
+const readerEmpty       = document.getElementById('reader-empty');
+const readerPageWrap    = document.getElementById('reader-page-wrap');
+const readerPageCanvas  = document.getElementById('reader-page-canvas');
+const readerAnnotCanvas = document.getElementById('reader-annot-canvas');
+const readerPageCtx     = readerPageCanvas.getContext('2d');
+const readerAnnotCtx    = readerAnnotCanvas.getContext('2d');
+const readerStatusbar   = document.getElementById('reader-statusbar');
+const readerPageNumInput = document.getElementById('reader-page-num');
+const readerPageTotalEl = document.getElementById('reader-page-total');
+const readerZoomSlider  = document.getElementById('reader-zoom');
+const readerZoomLabel   = document.getElementById('reader-zoom-label');
+const readerSaveBtn     = document.getElementById('reader-save-btn');
+const readerNotePopup   = document.getElementById('reader-note-popup');
+const readerNoteInput   = document.getElementById('reader-note-input');
+
+// ── Coordinate helpers (PDF point space <-> canvas pixel space) ──
+function readerScale() { return readerDpi / 72; }
+
+function readerPtToPx(x, y) {
+  const s = readerScale();
+  return { x: x * s, y: y * s };
+}
+
+function readerPxToPt(x, y) {
+  const s = readerScale();
+  return { x: x / s, y: y / s };
+}
+
+// Convert a pointer event (screen coords) to canvas-pixel coords,
+// accounting for any CSS scaling of the canvas element.
+function readerEventToCanvasPx(evt) {
+  const rect = readerAnnotCanvas.getBoundingClientRect();
+  const scaleX = readerAnnotCanvas.width / rect.width;
+  const scaleY = readerAnnotCanvas.height / rect.height;
+  return {
+    x: (evt.clientX - rect.left) * scaleX,
+    y: (evt.clientY - rect.top) * scaleY,
+  };
+}
+
+// ── Open / navigate ────────────────────────────
+function openReader() {
+  // Always starts fresh from the empty state when the tool is (re)selected
+  // from the home grid, same as every other tool card — reopening the
+  // last file is one click away via the empty state's own button.
+  readerPath = null;
+  readerPage = 1;
+  readerPageCount = 0;
+  readerAnnotations = {};
+  readerDirty = false;
+  readerMode = 'pan';
+  readerZoomPct = 100;
+  readerDpi = 96;
+  readerZoomSlider.value = 100;
+  readerZoomLabel.textContent = '100%';
+  updateReaderModeButtons();
+  readerControls.classList.remove('visible');
+  readerStatusbar.classList.remove('visible');
+  readerPageWrap.classList.remove('visible');
+  readerEmpty.classList.add('visible');
+  readerDocTitleEl.textContent = '';
+  readerSaveBtn.classList.remove('dirty');
+  readerNotePopup.classList.remove('visible');
+  readerNotePopupResolver = null;
+}
+
+function pickAndOpenReaderPdf() {
+  sendIpc({ action: 'pick_files', kind: 'pdf', multiple: false })
+    .then(res => {
+      if (res.status === 'paths' && res.paths && res.paths.length) {
+        openReaderPath(res.paths[0]);
+      }
+    })
+    .catch(err => toast('error', String(err)));
+}
+
+async function openReaderPath(path) {
+  try {
+    const countRes = await sendIpc({ action: 'get_page_count', path });
+    if (countRes.status !== 'page_count') {
+      toast('error', countRes.message || 'Could not open that file.');
+      return;
+    }
+
+    readerPath = path;
+    readerPageCount = countRes.count;
+    readerPage = 1;
+    readerDocTitleEl.textContent = path.split(/[\\/]/).pop();
+    readerPageTotalEl.textContent = String(readerPageCount);
+
+    const annotRes = await sendIpc({ action: 'load_annotations', path });
+    readerAnnotations = annotRes.status === 'annotations' ? (annotRes.pages || {}) : {};
+    readerDirty = false;
+    readerSaveBtn.classList.remove('dirty');
+
+    readerEmpty.classList.remove('visible');
+    readerControls.classList.add('visible');
+    readerStatusbar.classList.add('visible');
+    readerPageWrap.classList.add('visible');
+
+    await goToReaderPage(1);
+  } catch (err) {
+    toast('error', String(err));
+  }
+}
+
+async function goToReaderPage(n) {
+  if (!readerPath || n < 1 || n > readerPageCount) return;
+  readerPage = n;
+  readerPageNumInput.value = String(n);
+  updateReaderNavButtons();
+  await renderReaderPage();
+}
+
+async function renderReaderPage() {
+  if (!readerPath) return;
+  try {
+    const res = await sendIpc({
+      action: 'render_page',
+      path: readerPath,
+      page: readerPage,
+      dpi: readerDpi,
+    });
+    if (res.status !== 'page') {
+      toast('error', res.message || 'Failed to render that page.');
+      return;
+    }
+    await drawReaderPageImage(res.data_url);
+  } catch (err) {
+    toast('error', String(err));
+  }
+}
+
+function drawReaderPageImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      readerPageCanvas.width = img.width;
+      readerPageCanvas.height = img.height;
+      readerAnnotCanvas.width = img.width;
+      readerAnnotCanvas.height = img.height;
+      readerPageCanvas.style.width = img.width + 'px';
+      readerPageCanvas.style.height = img.height + 'px';
+      readerAnnotCanvas.style.width = img.width + 'px';
+      readerAnnotCanvas.style.height = img.height + 'px';
+      readerPageCtx.drawImage(img, 0, 0);
+      redrawReaderAnnotations();
+      resolve();
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function updateReaderNavButtons() {
+  document.getElementById('reader-prev-btn').disabled = readerPage <= 1;
+  document.getElementById('reader-next-btn').disabled = readerPage >= readerPageCount;
+}
+
+// ── Annotation rendering ───────────────────────
+function redrawReaderAnnotations() {
+  readerAnnotCtx.clearRect(0, 0, readerAnnotCanvas.width, readerAnnotCanvas.height);
+  const list = readerAnnotations[String(readerPage)] || [];
+  for (const a of list) drawReaderAnnotation(a);
+}
+
+function drawReaderAnnotation(a) {
+  if (a.type === 'highlight') {
+    const p1 = readerPtToPx(a.rect.x, a.rect.y);
+    const p2 = readerPtToPx(a.rect.x + a.rect.w, a.rect.y + a.rect.h);
+    readerAnnotCtx.fillStyle = hexToRgba(a.color, 0.35);
+    readerAnnotCtx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+  } else if (a.type === 'note') {
+    const p = readerPtToPx(a.point.x, a.point.y);
+    readerAnnotCtx.beginPath();
+    readerAnnotCtx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+    readerAnnotCtx.fillStyle = a.color;
+    readerAnnotCtx.fill();
+    readerAnnotCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+    readerAnnotCtx.lineWidth = 1;
+    readerAnnotCtx.stroke();
+    readerAnnotCtx.fillStyle = '#24221d';
+    readerAnnotCtx.font = 'bold 11px system-ui';
+    readerAnnotCtx.textAlign = 'center';
+    readerAnnotCtx.textBaseline = 'middle';
+    readerAnnotCtx.fillText('!', p.x, p.y + 0.5);
+  } else if (a.type === 'ink') {
+    if (!a.points || a.points.length < 2) return;
+    readerAnnotCtx.strokeStyle = a.color;
+    readerAnnotCtx.lineWidth = Math.max(1.5, (a.width || 2) * readerScale() * 0.5);
+    readerAnnotCtx.lineJoin = 'round';
+    readerAnnotCtx.lineCap = 'round';
+    readerAnnotCtx.beginPath();
+    a.points.forEach((pt, i) => {
+      const p = readerPtToPx(pt.x, pt.y);
+      if (i === 0) readerAnnotCtx.moveTo(p.x, p.y);
+      else readerAnnotCtx.lineTo(p.x, p.y);
+    });
+    readerAnnotCtx.stroke();
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function rectFrom(a, b) {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x),
+    h: Math.abs(b.y - a.y),
+  };
+}
+
+function pushReaderAnnotation(a) {
+  const key = String(readerPage);
+  if (!readerAnnotations[key]) readerAnnotations[key] = [];
+  readerAnnotations[key].push(a);
+  redrawReaderAnnotations();
+  markReaderDirty();
+}
+
+function markReaderDirty() {
+  readerDirty = true;
+  readerSaveBtn.classList.add('dirty');
+}
+
+async function saveReaderAnnotations(opts) {
+  const silent = !!(opts && opts.silent);
+  if (!readerPath) return;
+  try {
+    const res = await sendIpc({
+      action: 'save_annotations',
+      path: readerPath,
+      annotations: readerAnnotations,
+    });
+    if (res.status === 'ok') {
+      readerDirty = false;
+      readerSaveBtn.classList.remove('dirty');
+      if (!silent) toast('success', 'Annotations saved.');
+    } else if (!silent) {
+      toast('error', res.message || 'Failed to save annotations.');
+    }
+  } catch (err) {
+    if (!silent) toast('error', String(err));
+  }
+}
+
+function undoReaderLast() {
+  const key = String(readerPage);
+  const list = readerAnnotations[key];
+  if (list && list.length) {
+    list.pop();
+    redrawReaderAnnotations();
+    markReaderDirty();
+  }
+}
+
+// Saves first (quietly) if there are unsaved marks, then proceeds — used
+// for Back and "open a different file", so leaving the reader can never
+// silently lose annotations, without needing a native confirm() dialog
+// (which the rest of this app avoids; see the note popup below).
+async function leaveReaderSafely(next) {
+  if (readerDirty) {
+    await saveReaderAnnotations({ silent: true });
+  }
+  next();
+}
+
+// ── Note popup (custom, avoids relying on window.prompt in a webview) ──
+function showReaderNotePopup(screenX, screenY) {
+  readerNotePopup.style.left = screenX + 'px';
+  readerNotePopup.style.top = screenY + 'px';
+  readerNotePopup.classList.add('visible');
+  readerNoteInput.value = '';
+  readerNoteInput.focus();
+  return new Promise(resolve => { readerNotePopupResolver = resolve; });
+}
+
+function hideReaderNotePopup() {
+  readerNotePopup.classList.remove('visible');
+  readerNotePopupResolver = null;
+}
+
+document.getElementById('reader-note-ok').addEventListener('click', () => {
+  const val = readerNoteInput.value.trim();
+  if (readerNotePopupResolver) readerNotePopupResolver(val || null);
+  hideReaderNotePopup();
+});
+document.getElementById('reader-note-cancel').addEventListener('click', () => {
+  if (readerNotePopupResolver) readerNotePopupResolver(null);
+  hideReaderNotePopup();
+});
+readerNoteInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('reader-note-ok').click();
+  if (e.key === 'Escape') document.getElementById('reader-note-cancel').click();
+});
+
+async function addReaderNoteAt(pt, screenX, screenY) {
+  const text = await showReaderNotePopup(screenX, screenY);
+  if (text) pushReaderAnnotation({ type: 'note', color: readerColor, point: pt, text });
+}
+
+// ── Pointer interaction on the annotation canvas ──
+readerAnnotCanvas.addEventListener('pointerdown', evt => {
+  if (readerMode === 'pan' || !readerPath) return;
+  const { x, y } = readerEventToCanvasPx(evt);
+  const pt = readerPxToPt(x, y);
+
+  if (readerMode === 'highlight') {
+    readerDragStart = pt;
+    readerAnnotCanvas.setPointerCapture(evt.pointerId);
+  } else if (readerMode === 'note') {
+    addReaderNoteAt(pt, evt.clientX, evt.clientY);
+  } else if (readerMode === 'ink') {
+    readerInkDrawing = [pt];
+    readerAnnotCanvas.setPointerCapture(evt.pointerId);
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointermove', evt => {
+  if (readerMode === 'highlight' && readerDragStart) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    redrawReaderAnnotations();
+    drawReaderAnnotation({ type: 'highlight', color: readerColor, rect: rectFrom(readerDragStart, pt) });
+  } else if (readerMode === 'ink' && readerInkDrawing) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    readerInkDrawing.push(pt);
+    redrawReaderAnnotations();
+    drawReaderAnnotation({ type: 'ink', color: readerColor, width: 2, points: readerInkDrawing });
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointerup', evt => {
+  if (readerMode === 'highlight' && readerDragStart) {
+    const { x, y } = readerEventToCanvasPx(evt);
+    const pt = readerPxToPt(x, y);
+    const rect = rectFrom(readerDragStart, pt);
+    if (rect.w > 2 && rect.h > 2) pushReaderAnnotation({ type: 'highlight', color: readerColor, rect });
+    readerDragStart = null;
+    redrawReaderAnnotations();
+  } else if (readerMode === 'ink' && readerInkDrawing) {
+    if (readerInkDrawing.length > 1) pushReaderAnnotation({ type: 'ink', color: readerColor, width: 2, points: readerInkDrawing });
+    readerInkDrawing = null;
+    redrawReaderAnnotations();
+  }
+});
+
+readerAnnotCanvas.addEventListener('pointerleave', () => {
+  if (readerDragStart || readerInkDrawing) {
+    readerDragStart = null;
+    readerInkDrawing = null;
+    redrawReaderAnnotations();
+  }
+});
+
+// ── Toolbar wiring ─────────────────────────────
+function updateReaderModeButtons() {
+  document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.dataset.mode === readerMode);
+  });
+  readerStage.classList.remove('mode-pan', 'mode-highlight', 'mode-note', 'mode-ink');
+  readerStage.classList.add('mode-' + readerMode);
+}
+
+document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    readerMode = chip.dataset.mode;
+    updateReaderModeButtons();
+  });
+});
+
+document.getElementById('reader-color').addEventListener('input', e => { readerColor = e.target.value; });
+
+document.getElementById('reader-open-btn').addEventListener('click', () => leaveReaderSafely(pickAndOpenReaderPdf));
+document.getElementById('reader-empty-open-btn').addEventListener('click', pickAndOpenReaderPdf);
+document.getElementById('reader-back-btn').addEventListener('click', () => leaveReaderSafely(goHome));
+readerSaveBtn.addEventListener('click', () => saveReaderAnnotations());
+document.getElementById('reader-undo-btn').addEventListener('click', undoReaderLast);
+
+document.getElementById('reader-prev-btn').addEventListener('click', () => goToReaderPage(readerPage - 1));
+document.getElementById('reader-next-btn').addEventListener('click', () => goToReaderPage(readerPage + 1));
+
+readerPageNumInput.addEventListener('change', () => {
+  const n = parseInt(readerPageNumInput.value, 10);
+  if (!Number.isNaN(n)) goToReaderPage(n);
+  else readerPageNumInput.value = String(readerPage);
+});
+
+readerZoomSlider.addEventListener('input', async e => {
+  readerZoomPct = Number(e.target.value);
+  readerDpi = Math.round(96 * (readerZoomPct / 100));
+  readerZoomLabel.textContent = readerZoomPct + '%';
+  await renderReaderPage();
+});
+
+// ── Keyboard shortcuts (only while the reader is the active view) ──
+window.addEventListener('keydown', e => {
+  if (!readerView.classList.contains('active')) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT') return; // don't hijack typing in the page/note inputs
+
+  if (e.key === 'ArrowRight') goToReaderPage(readerPage + 1);
+  if (e.key === 'ArrowLeft') goToReaderPage(readerPage - 1);
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveReaderAnnotations(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoReaderLast(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); leaveReaderSafely(pickAndOpenReaderPdf); }
+});
+
+// ── Global drag-and-drop ──────────────────────
+document.addEventListener('dragenter', e => {
+  if (e.dataTransfer.types.includes('Files')) {
+    dropOverlay.classList.add('active');
+  }
+});
+document.addEventListener('dragleave', e => {
+  if (!e.relatedTarget) dropOverlay.classList.remove('active');
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dropOverlay.classList.remove('active');
+
+  if (currentTool && currentTool.isReader) {
+    // The reader keeps a single open document (currentReaderPath), not the
+    // generic multi-file list the other tools use, and — like every other
+    // drop target in this app — a dropped File object never carries a real
+    // filesystem path in a webview, so fall back to the native picker
+    // rather than trying to use it directly.
+    pickAndOpenReaderPdf();
+    return;
+  }
+
+  const allFiles = Array.from(e.dataTransfer.files);
+  const pdfs   = allFiles.filter(f => f.name.endsWith('.pdf'));
+  const images = allFiles.filter(f => f.type.startsWith('image/'));
+
+  if (currentTool) {
+    // In a task — add to current file list
+    addFiles(currentTool.acceptImages ? images : pdfs);
+    return;
+  }
+
+  // On home screen
+  if (images.length > 0 && pdfs.length === 0) {
+    openTool('images-to-pdf', images);
+  } else if (pdfs.length > 1) {
+    openTool('merge', pdfs);
+  } else if (pdfs.length === 1) {
+    openTool('merge', pdfs);
+  }
+});
+</script>
+</body>
+</html>
