@@ -24,7 +24,21 @@ serde_json = "1"
 # copied between documents via PdfDocument::find_page + PdfGraftMap::graft_object
 # (see src/pdf/pdf_ops.rs), following MuPDF's own documented "copyPage" recipe —
 # not via any built-in "insert_pdf" helper, which does not exist in this crate.
-mupdf = "0.8"
+#
+# default-features disabled on purpose: upstream's defaults statically link a
+# JS engine (mujs, for interactive form scripts), Tesseract OCR, and XPS/SVG/
+# CBZ/HTML/EPUB/DOCX-output/Brotli support on top of the core PDF reader/
+# writer. None of that is reachable from this codebase — grep every `use
+# mupdf::` in src/ and the only things imported are PdfDocument/PdfGraftMap/
+# PdfObject/PdfWriteOptions/Encryption/Permission (core PDF read-write and
+# standard PDF encryption, not gated behind any of those features) and
+# Document/Image/Colorspace/ImageFormat/InsertImageOptions/Matrix/
+# PageImageSource/Rect/Size (rendering + image insert). "img" is kept because
+# images.rs decodes standalone PNG/JPG/WEBP/BMP files via Image::from_file for
+# the images-to-pdf tool. If a future feature needs OCR, forms/JS, or another
+# document format, add that feature back deliberately rather than reverting to
+# the full default set.
+mupdf = { version = "0.8", default-features = false, features = ["img"] }
 tempfile = "3"
 anyhow = "1"
 log = "0.4"
@@ -42,6 +56,11 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
+# NOTE: deliberately NOT setting panic = "abort" here. src/ipc.rs wraps every
+# PDF operation in catch_unwind so a panic from a malformed/corrupt PDF turns
+# into a normal error response to the UI instead of taking the whole app
+# down (see the comment there). panic = "abort" would silently defeat that
+# safety net for a small, unmeasured size saving — not worth it.
 
 [profile.dev]
 opt-level = 0
