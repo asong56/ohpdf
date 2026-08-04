@@ -33,12 +33,26 @@ serde_json = "1"
 # PdfObject/PdfWriteOptions/Encryption/Permission (core PDF read-write and
 # standard PDF encryption, not gated behind any of those features) and
 # Document/Image/Colorspace/ImageFormat/InsertImageOptions/Matrix/
-# PageImageSource/Rect/Size (rendering + image insert). "img" is kept because
-# images.rs decodes standalone PNG/JPG/WEBP/BMP files via Image::from_file for
-# the images-to-pdf tool. If a future feature needs OCR, forms/JS, or another
-# document format, add that feature back deliberately rather than reverting to
-# the full default set.
-mupdf = { version = "0.8", default-features = false, features = ["img"] }
+# PageImageSource/Rect/Size (rendering + image insert).
+#
+# Kept features:
+#   - "img": images.rs decodes standalone PNG/JPG/WEBP/BMP files via
+#     Image::from_file for the images-to-pdf tool.
+#   - "base14-fonts": the 14 standard PDF fonts (Helvetica/Times/Courier/...).
+#     Most simple text PDFs reference these WITHOUT embedding the actual font
+#     program, relying on the reader to supply the glyph outlines. Without
+#     this, any operation that rasterizes/renders a page (compress, watermark
+#     text, pdf-to-images, thumbnails, the in-app reader) fails on such files
+#     — which is most real-world PDFs. (Learned this the hard way: an earlier
+#     version of this line dropped it along with the unused stuff above and
+#     broke compress/watermark/read on ordinary text PDFs.)
+#   - "system-fonts": fallback to whatever fonts are actually installed on
+#     the OS (e.g. CJK) for glyphs base14 doesn't cover. Also needed for
+#     correct rendering, kept for the same reason as base14-fonts above.
+# If a future feature needs OCR, forms/JS, or another document format, add
+# that feature back deliberately rather than reverting to the full default
+# set.
+mupdf = { version = "0.8", default-features = false, features = ["img", "base14-fonts", "system-fonts"] }
 tempfile = "3"
 anyhow = "1"
 log = "0.4"
