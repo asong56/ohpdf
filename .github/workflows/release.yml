@@ -39,10 +39,6 @@ jobs:
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        # NOTE: the `mupdf` crate vendors and builds MuPDF from source via
-        # `mupdf-sys` (there is no `mupdf = "0.8"` prebuilt system package to
-        # link against), so we only need a C/C++ toolchain plus WebKitGTK for
-        # the wry webview — not `libmupdf-dev`.
         run: |
           sudo apt-get update
           sudo apt-get install -y \
