@@ -64,7 +64,18 @@ pub fn copy_page(
         .add_object(&new_page)
         .context("Failed to register the new page object.")?;
 
-    dst.insert_page(insert_at, &page_ref)
+    // mupdf 0.8's insert_page does not accept -1 as "append to end" —
+    // passing -1 causes "page_no is not a valid page". The caller
+    // passes -1 to mean "append", so we resolve that here to the actual
+    // current page count, which is always the correct append index.
+    let at = if insert_at < 0 {
+        dst.page_count()
+            .context("Failed to get destination page count for append.")? as i32
+    } else {
+        insert_at
+    };
+
+    dst.insert_page(at, &page_ref)
         .with_context(|| format!("Failed to insert page {} into output.", src_page_no + 1))?;
 
     Ok(())
