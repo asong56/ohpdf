@@ -78,7 +78,6 @@ pub enum IpcRequest {
         text: String,
         font_size: Option<f32>,
         opacity: Option<f32>,
-        rotation: Option<f32>,
     },
     GetPageCount {
         path: String,
@@ -282,6 +281,17 @@ pub fn make_handler(
                 }
             });
 
+            // Log every error response to stderr too, not just the UI toast
+            // — makes it possible to just read the terminal a failure
+            // happened in, instead of having to screenshot/retype whatever
+            // the toast shows. (The panic branch above already logs
+            // separately, before this point, so this only double-logs the
+            // rare case where a panic *also* produced an `Error` response —
+            // harmless.)
+            if let IpcResponse::Error { message } = &response {
+                log::error!("IPC request {:?} failed: {}", id, message);
+            }
+
             let json = serde_json::to_string(&ResponseEnvelope {
                 id: &id,
                 response,
@@ -308,6 +318,16 @@ pub fn make_handler(
     }
 }
 
+// Every `Err(e) => IpcResponse::Error { message: format!("{:#}", e) }` below
+// uses anyhow's *alternate* Display (`{:#}`), not `e.to_string()`/`{}`. The
+// two look almost the same in a diff but are not: `{}` only prints the
+// outermost `.context(...)` message (e.g. "Failed to save compressed
+// file."), silently dropping every inner cause anyhow chained underneath
+// it. `{:#}` walks and prints the *entire* chain ("Failed to save
+// compressed file.: <cause>: <root cause>"). Every failure toast in this
+// app was, until now, showing only that outer sentence — which is exactly
+// why intermittent save failures were impossible to diagnose from the UI
+// alone. Keep using `{:#}` in any new arm added here.
 fn handle_request(request: IpcRequest) -> IpcResponse {
     match request {
         IpcRequest::Merge { paths } => {
@@ -324,7 +344,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Merged successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -348,7 +368,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some(format!("Split into {} file(s).", outputs.len())),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -362,7 +382,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Compressed successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -376,7 +396,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Encrypted successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -390,7 +410,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Decrypted successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -404,7 +424,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some(format!("Deleted {} page(s).", pages.len())),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -418,7 +438,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some(format!("Extracted {} page(s).", pages.len())),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -436,7 +456,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Rotated successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -450,7 +470,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Pages reordered successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -468,7 +488,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     }
                 }
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -490,19 +510,18 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some(format!("Combined {} image(s) into a PDF.", img_paths.len())),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
 
-        IpcRequest::AddWatermark { path, text, font_size, opacity, rotation } => {
+        IpcRequest::AddWatermark { path, text, font_size, opacity } => {
             let src = PathBuf::from(&path);
             let output = derive_output(&src, "watermarked");
             let opts = pdf::WatermarkOptions {
                 text: &text,
                 font_size: font_size.unwrap_or(60.0),
                 opacity:   opacity.unwrap_or(0.15),
-                rotation:  rotation.unwrap_or(45.0),
                 color:     (0.5, 0.5, 0.5),
             };
             match pdf::add_watermark(&src, &output, &opts) {
@@ -511,7 +530,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Watermark added successfully.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -520,7 +539,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
             match pdf::page_count(&PathBuf::from(&path)) {
                 Ok(count) => IpcResponse::PageCount { count },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -537,7 +556,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                         .collect(),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -551,7 +570,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
             match pdf::render_page(&src, page, dpi) {
                 Ok(data_url) => IpcResponse::Page { data_url },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -560,7 +579,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
             match pdf::load_annotations(&PathBuf::from(&path)) {
                 Ok(pages) => IpcResponse::Annotations { pages },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -572,7 +591,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
                     message: Some("Annotations saved.".into()),
                 },
                 Err(e) => IpcResponse::Error {
-                    message: e.to_string(),
+                    message: format!("{:#}", e),
                 },
             }
         }
@@ -630,8 +649,17 @@ fn reveal_in_finder(path: &str) {
     }
     #[cfg(target_os = "windows")]
     {
+        // explorer.exe does its own ad-hoc command-line parsing rather than
+        // treating argv entries independently, and it wants `/select,` glued
+        // directly to the path with no space and no separate argv slot.
+        // Passing them as two separate `.args([...])` entries — as this used
+        // to — lets Rust's normal Windows argument-quoting insert a boundary
+        // explorer's parser doesn't expect for this switch, and it silently
+        // falls back to just opening a default folder instead of selecting
+        // the file (no error, no crash — it just quietly doesn't do what the
+        // button says). Passing one single, pre-joined argument avoids that.
         let _ = std::process::Command::new("explorer")
-            .args(["/select,", path])
+            .arg(format!("/select,{}", path))
             .spawn();
     }
     #[cfg(target_os = "linux")]

@@ -11,20 +11,19 @@ use super::pdf_ops::compact_write_options;
 /// per-image JPEG-quality knob. `quality` is kept as an input for the UI's
 /// sake and used only to pick how aggressive the (lossless) optimization is;
 /// it is documented here rather than silently doing nothing.
-pub fn compress(input: &Path, output: &Path, quality: Option<u8>) -> Result<()> {
+pub fn compress(input: &Path, output: &Path, _quality: Option<u8>) -> Result<()> {
     let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
-
-    let q = quality.unwrap_or(75).clamp(10, 100);
 
     let mut opts = compact_write_options(); // garbage + compress
     opts.set_compress_images(true)
         .set_compress_fonts(true)
-        .set_clean(true)
-        // Lower "quality" tiers additionally linearize (fast web view) and
-        // strip more aggressively; this is the closest equivalent this crate
-        // exposes to a single 0-100 quality slider.
-        .set_linear(q < 80);
+        .set_clean(true);
+    // NOTE: set_linear() was removed here. mupdf 0.8 dropped linearisation
+    // support entirely ("Linearisation is no longer supported") — calling it
+    // always fails at save time regardless of the input file. The remaining
+    // options (garbage-collect, compress streams, compress images/fonts, clean
+    // content streams) still produce meaningfully smaller files without it.
 
     doc.save_with_options(output.to_str().context("Output path contains invalid characters.")?, opts)
         .context("Failed to save compressed file.")?;
