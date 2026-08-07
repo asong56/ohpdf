@@ -18,49 +18,11 @@ tao = "0.30"
 wry = "0.46"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# NOTE: bumped from "0.4" -> "0.8": 0.4's public API in this repo (WriteOptions,
-# Permissions, Document::copy_page_from/rotate_page/add_page, Color, ...) does not
-# exist in the published crate at all; 0.8 is the current release. Pages are
-# copied between documents via PdfDocument::find_page + PdfGraftMap::graft_object
-# (see src/pdf/pdf_ops.rs), following MuPDF's own documented "copyPage" recipe —
-# not via any built-in "insert_pdf" helper, which does not exist in this crate.
-#
-# default-features disabled on purpose: upstream's defaults statically link a
-# JS engine (mujs, for interactive form scripts), Tesseract OCR, and XPS/SVG/
-# CBZ/HTML/EPUB/DOCX-output/Brotli support on top of the core PDF reader/
-# writer. None of that is reachable from this codebase — grep every `use
-# mupdf::` in src/ and the only things imported are PdfDocument/PdfGraftMap/
-# PdfObject/PdfWriteOptions/Encryption/Permission (core PDF read-write and
-# standard PDF encryption, not gated behind any of those features) and
-# Document/Image/Colorspace/ImageFormat/InsertImageOptions/Matrix/
-# PageImageSource/Rect/Size (rendering + image insert).
-#
-# Kept features:
-#   - "img": images.rs decodes standalone PNG/JPG/WEBP/BMP files via
-#     Image::from_file for the images-to-pdf tool.
-#   - "base14-fonts": the 14 standard PDF fonts (Helvetica/Times/Courier/...).
-#     Most simple text PDFs reference these WITHOUT embedding the actual font
-#     program, relying on the reader to supply the glyph outlines. Without
-#     this, any operation that rasterizes/renders a page (compress, watermark
-#     text, pdf-to-images, thumbnails, the in-app reader) fails on such files
-#     — which is most real-world PDFs. (Learned this the hard way: an earlier
-#     version of this line dropped it along with the unused stuff above and
-#     broke compress/watermark/read on ordinary text PDFs.)
-#   - "system-fonts": fallback to whatever fonts are actually installed on
-#     the OS (e.g. CJK) for glyphs base14 doesn't cover. Also needed for
-#     correct rendering, kept for the same reason as base14-fonts above.
-# If a future feature needs OCR, forms/JS, or another document format, add
-# that feature back deliberately rather than reverting to the full default
-# set.
 mupdf = { version = "0.8", default-features = false, features = ["img", "base14-fonts", "system-fonts"] }
 tempfile = "3"
 anyhow = "1"
 log = "0.4"
 env_logger = "0.11"
-# Native "open file" dialog. The previous code assumed browser `File` objects
-# expose a `.path` property, which no webview (WebView2 / WKWebView / WebKitGTK)
-# actually provides for security reasons. rfd gives us a real OS file dialog
-# from Rust, so we always get a real absolute path.
 rfd = "0.14"
 base64 = "0.22"
 dirs = "5"
@@ -70,11 +32,6 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-# NOTE: deliberately NOT setting panic = "abort" here. src/ipc.rs wraps every
-# PDF operation in catch_unwind so a panic from a malformed/corrupt PDF turns
-# into a normal error response to the UI instead of taking the whole app
-# down (see the comment there). panic = "abort" would silently defeat that
-# safety net for a small, unmeasured size saving — not worth it.
 
 [profile.dev]
 opt-level = 0
