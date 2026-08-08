@@ -1,0 +1,37 @@
+Windows Registry Editor Version 5.00
+
+; OhPDF right-click context menu entries for .pdf files
+; Double-click this file to install, or run:
+;   reg import install-windows-rightclick.reg
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF]
+@="OhPDF"
+"SubCommands"=""
+"MUIVerb"="OhPDF"
+"Icon"="%ProgramFiles%\\OhPDF\\ohpdf.exe,0"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell]
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\01_compress]
+@="Compress PDF"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\01_compress\command]
+@="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" compress \"%1\" \"%~dpn1_compressed.pdf\"\""
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\02_to_images]
+@="Export to Images"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\02_to_images\command]
+@="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" to-images \"%1\"\""
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_watermark]
+@="Add Watermark (Confidential)"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_watermark\command]
+@="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" watermark \"%1\" \"%~dpn1_watermarked.pdf\" -t Confidential\""
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_open_gui]
+@="Open in OhPDF..."
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_open_gui\command]
+@="\"%ProgramFiles%\\OhPDF\\ohpdf-desktop.exe\""

@@ -1,0 +1,14 @@
+[package]
+name = "ohpdf-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ohpdf-cli"
+path = "src/main.rs"
+
+[dependencies]
+ohpdf-core = { path = "../ohpdf-core" }
+anyhow = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }

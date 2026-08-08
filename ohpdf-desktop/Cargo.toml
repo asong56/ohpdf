@@ -1,0 +1,21 @@
+[package]
+name = "ohpdf-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ohpdf"
+path = "src/main.rs"
+
+[dependencies]
+ohpdf-core = { path = "../ohpdf-core" }
+tao = { workspace = true }
+wry = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+rfd = { workspace = true }
+base64 = { workspace = true }
+dirs = { workspace = true }
+anyhow = { workspace = true }
