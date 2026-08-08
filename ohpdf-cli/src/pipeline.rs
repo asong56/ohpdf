@@ -97,22 +97,16 @@ fn stdin_is_tty() -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::io::AsRawFd;
-        // SAFETY: isatty is always safe to call with a valid fd
-        unsafe { libc_isatty(std::io::stdin().as_raw_fd()) }
+        libc_isatty(std::io::stdin().as_raw_fd())
     }
     #[cfg(not(unix))]
     {
-        // On Windows, assume not a tty when the stage name matches —
-        // GetConsoleMode could be used but adds complexity; this is sufficient
-        // for practical pipeline use.
         false
     }
 }
 
 #[cfg(unix)]
 fn libc_isatty(fd: std::os::unix::io::RawFd) -> bool {
-    // We call isatty(3) via inline syscall to avoid adding libc as a dep.
-    // On Linux/macOS the ABI is stable and the call is trivial.
     extern "C" {
         fn isatty(fd: i32) -> i32;
     }
