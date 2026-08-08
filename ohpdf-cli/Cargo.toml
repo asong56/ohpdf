@@ -12,3 +12,4 @@ ohpdf-core = { path = "../ohpdf-core" }
 anyhow = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
+tempfile = "3"
