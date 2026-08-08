@@ -1,38 +1,17 @@
-[package]
-name = "ohpdf"
-version = "0.1.0"
-edition = "2021"
-authors = ["OhPDF Contributors"]
-description = "A PDF tool that lives on your computer. No upload. No account. Just PDF."
-license = "MIT"
-repository = "https://github.com/yourusername/ohpdf"
-readme = "README.md"
-keywords = ["pdf", "desktop", "local", "tools"]
+[workspace]
+members = ["ohpdf-core", "ohpdf-desktop", "ohpdf-cli"]
+resolver = "2"
 
-[[bin]]
-name = "ohpdf"
-path = "src/main.rs"
-
-[dependencies]
-tao = "0.30"
-wry = "0.46"
-serde = { version = "1", features = ["derive"] }
+[workspace.dependencies]
+mupdf      = { version = "0.8", default-features = false, features = ["img", "base14-fonts", "system-fonts"] }
+anyhow     = "1"
+serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
-mupdf = { version = "0.8", default-features = false, features = ["img", "base14-fonts", "system-fonts"] }
-tempfile = "3"
-anyhow = "1"
-log = "0.4"
+log        = "0.4"
+tempfile   = "3"
+tao        = "0.30"
+wry        = "0.46"
+dirs       = "5"
+rfd        = "0.14"
+base64     = "0.22"
 env_logger = "0.11"
-rfd = "0.14"
-base64 = "0.22"
-dirs = "5"
-
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-strip = true
-
-[profile.dev]
-opt-level = 0
-debug = true

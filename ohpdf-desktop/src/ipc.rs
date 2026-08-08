@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use tao::event_loop::EventLoopProxy;
 
-use crate::pdf;
+use ohpdf_core::pdf;
 use crate::WakeUp;
 
 /// Every message from JS is wrapped with a client-generated `id` so that
@@ -478,7 +478,7 @@ fn handle_request(request: IpcRequest) -> IpcResponse {
         IpcRequest::PdfToImages { path, dpi } => {
             let src = PathBuf::from(&path);
             let dpi = dpi.unwrap_or(150).clamp(72, 600);
-            match pdf::pdf_to_images(&src, dpi) {
+            match pdf::pdf_to_images(&src, dpi, None) {
                 Ok(paths) => {
                     let first = paths.first().cloned().unwrap_or(src);
                     let dir = first.parent().unwrap_or(&first).to_string_lossy().into_owned();
