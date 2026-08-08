@@ -1,3 +1,4 @@
+use super::report;
 use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use ohpdf_core::pdf;
@@ -26,6 +27,6 @@ pub fn run(args: &[String]) -> Result<()> {
     }
 
     pdf::compress(&input_path, &PathBuf::from(&output), quality)?;
-    println!("Saved: {}", output);
+    report(&input_path, &std::path::PathBuf::from(&output));
     Ok(())
 }

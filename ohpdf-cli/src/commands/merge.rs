@@ -24,6 +24,7 @@ pub fn run(args: &[String]) -> Result<()> {
 
     println!("Merging {} PDF(s)...", input_paths.len());
     pdf::merge(&input_paths, &PathBuf::from(&output))?;
+    // merge: no single input size to compare
     println!("Saved: {}", output);
     Ok(())
 }

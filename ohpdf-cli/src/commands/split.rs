@@ -1,3 +1,4 @@
+use super::report;
 use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use ohpdf_core::pdf;
@@ -30,6 +31,6 @@ pub fn run(args: &[String]) -> Result<()> {
     }
 
     pdf::split(&input_path, &[(start, end)], &[PathBuf::from(&output)])?;
-    println!("Saved: {}", output);
+    report(&input_path, &std::path::PathBuf::from(&output));
     Ok(())
 }

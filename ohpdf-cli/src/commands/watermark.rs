@@ -1,3 +1,4 @@
+use super::report;
 use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use ohpdf_core::pdf;
@@ -38,6 +39,6 @@ pub fn run(args: &[String]) -> Result<()> {
     };
 
     pdf::add_watermark(&input_path, &PathBuf::from(&output), &opts)?;
-    println!("Saved: {}", output);
+    report(&input_path, &std::path::PathBuf::from(&output));
     Ok(())
 }
