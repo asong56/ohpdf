@@ -4,6 +4,7 @@ pub mod decrypt;
 pub mod encrypt;
 pub mod info;
 pub mod merge;
+pub mod rotate;
 pub mod split;
 pub mod to_images;
 pub mod watermark;

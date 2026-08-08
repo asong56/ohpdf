@@ -42,24 +42,6 @@
     /* ── Layout ── */
     #app { display: flex; flex-direction: column; height: 100vh; }
 
-    /* ── Title bar (drag region) ── */
-    #titlebar {
-      height: 40px;
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      -webkit-app-region: drag;
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-    }
-    #titlebar .wordmark {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: var(--text);
-      -webkit-app-region: no-drag;
-    }
-
     /* ── Main ── */
     #main {
       flex: 1;
@@ -71,15 +53,6 @@
 
     /* ── Home screen ── */
     #home { display: block; }
-    #home .label {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      margin-bottom: 16px;
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -129,13 +102,7 @@
       color: var(--text-dim);
       margin-top: 2px;
     }
-    .reading-entry .re-chevron {
-      font-size: 15px;
-      color: #666;
-      flex-shrink: 0;
-    }
-
-    .tool-card {
+.tool-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -151,6 +118,11 @@
       border-color: #3e3e3e;
     }
     .tool-card:active { transform: scale(0.98); }
+    .tool-card.drag-target {
+      border-color: #6b9fff;
+      background: rgba(107, 159, 255, 0.08);
+      box-shadow: 0 0 0 2px rgba(107, 159, 255, 0.25);
+    }
     .tool-card .icon { font-size: 20px; line-height: 1; }
     .tool-card .name {
       font-size: 13px;
@@ -213,12 +185,7 @@
       font-size: 22px;
       font-weight: 700;
       letter-spacing: -0.03em;
-      margin-bottom: 6px;
-    }
-    .task-desc {
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     /* ── File drop zone ── */
@@ -560,79 +527,87 @@
     .reader-toolbar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
+      gap: 4px;
+      padding: 0 8px;
+      height: 36px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
-      flex-wrap: wrap;
     }
-    .reader-toolbar .back-btn { margin-bottom: 0; }
+    .reader-toolbar .back-btn { margin-bottom: 0; padding: 4px 6px; }
     .reader-toolbar-controls {
       display: none;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 2px;
     }
     .reader-toolbar-controls.visible { display: flex; }
     .reader-toolbar-divider {
       width: 1px;
-      align-self: stretch;
+      height: 16px;
       background: var(--border);
-      margin: 0 2px;
+      margin: 0 4px;
+      flex-shrink: 0;
     }
     .reader-toolbar-spacer { flex: 1; }
     .reader-doc-title {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-dim);
-      max-width: 280px;
+      max-width: 200px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
+    /* Icon-only toolbar button */
     .reader-btn {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      font-family: var(--font);
+      justify-content: center;
+      width: 28px;
+      height: 28px;
       color: var(--text-dim);
-      background: var(--surface2);
-      border: 1px solid var(--border);
+      background: none;
+      border: 1px solid transparent;
       border-radius: var(--radius-sm);
-      padding: 7px 12px;
       cursor: pointer;
-      transition: border-color 0.1s, color 0.1s;
-      white-space: nowrap;
+      transition: border-color 0.1s, color 0.1s, background 0.1s;
+      flex-shrink: 0;
     }
-    .reader-btn:hover { border-color: #555; color: var(--text); }
+    .reader-btn:hover { border-color: var(--border); color: var(--text); background: var(--surface2); }
+    .reader-btn.active { color: var(--text); background: var(--surface2); border-color: var(--border); }
+    .reader-btn svg { width: 16px; height: 16px; }
 
+    /* Save button — shows a dot when dirty */
+    #reader-save-btn { position: relative; }
     .dirty-dot {
       display: none;
-      width: 6px;
-      height: 6px;
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: var(--text);
     }
-    #reader-save-btn.dirty .dirty-dot { display: inline-block; }
+    #reader-save-btn.dirty .dirty-dot { display: block; }
 
+    /* Color swatch — small circle, click opens native color picker */
     .reader-color-swatch {
-      width: 22px;
-      height: 22px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--border);
       overflow: hidden;
       position: relative;
       cursor: pointer;
       flex-shrink: 0;
+      margin: 0 4px;
     }
     .reader-color-swatch input[type="color"] {
       position: absolute;
-      inset: -4px;
-      width: calc(100% + 8px);
-      height: calc(100% + 8px);
+      inset: -6px;
+      width: calc(100% + 12px);
+      height: calc(100% + 12px);
       border: none;
       padding: 0;
       cursor: pointer;
@@ -683,9 +658,10 @@
     .reader-note-popup {
       position: fixed;
       display: none;
-      align-items: center;
+      flex-direction: column;
+      width: 220px;
+      padding: 8px;
       gap: 6px;
-      padding: 6px 6px 6px 10px;
       background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -693,15 +669,29 @@
       z-index: 250;
     }
     .reader-note-popup.visible { display: flex; }
-    .reader-note-popup input {
-      width: 200px;
-      background: transparent;
-      border: none;
+    .reader-note-popup textarea {
+      width: 100%;
+      min-height: 52px;
+      max-height: 160px;
+      resize: vertical;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
       outline: none;
       color: var(--text);
-      font-size: 13px;
+      font-size: 12px;
       font-family: var(--font);
+      line-height: 1.4;
+      padding: 6px 8px;
     }
+    .reader-note-popup textarea:focus { border-color: #555; }
+    .reader-note-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 2px;
+    }
+    .reader-note-actions .spacer { flex: 1; }
     .reader-note-popup button {
       display: flex;
       align-items: center;
@@ -713,9 +703,13 @@
       background: none;
       cursor: pointer;
       color: var(--text-dim);
-      font-size: 13px;
     }
+    .reader-note-popup button svg { width: 14px; height: 14px; }
     .reader-note-popup button:hover { color: var(--text); background: var(--surface); }
+    .reader-note-popup #reader-note-delete { display: none; }
+    .reader-note-popup #reader-note-delete:hover { color: var(--danger); }
+    .reader-note-popup.editing #reader-note-delete { display: flex; }
+    .reader-note-popup #reader-note-ok:hover { color: var(--success); background: var(--surface); }
 
     .reader-statusbar {
       display: none;
@@ -775,15 +769,10 @@
 <body>
 <div id="app">
 
-  <!-- Title bar -->
-  <div id="titlebar">
-    <span class="wordmark">OhPDF</span>
-  </div>
-
   <!-- Global drop overlay -->
   <div id="drop-overlay">
-    <div class="drop-icon">📄</div>
-    <div class="drop-text">Drop files to get started</div>
+    <div class="drop-icon">▭</div>
+    <div class="drop-text">Drop onto a card to use that tool, or anywhere to auto-route</div>
   </div>
 
   <!-- Main content -->
@@ -792,7 +781,6 @@
     <!-- Home screen -->
     <div id="home">
       <div id="reading-entry-slot"></div>
-      <div class="label">What would you like to do?</div>
       <div class="grid" id="tool-grid"></div>
     </div>
 
@@ -802,7 +790,6 @@
         ← Back
       </button>
       <div class="task-title" id="task-title"></div>
-      <div class="task-desc" id="task-desc"></div>
       <div id="task-body"></div>
     </div>
 
@@ -815,19 +802,46 @@
 
       <div class="reader-toolbar-controls" id="reader-controls">
         <div class="reader-toolbar-divider"></div>
-        <button class="reader-btn" id="reader-open-btn" title="Open a different PDF (Ctrl/Cmd+O)">Open</button>
-        <div class="rotate-options" id="reader-mode-group">
-          <div class="rotate-chip selected" data-mode="pan">Pan</div>
-          <div class="rotate-chip" data-mode="highlight">Highlight</div>
-          <div class="rotate-chip" data-mode="note">Note</div>
-          <div class="rotate-chip" data-mode="ink">Draw</div>
+
+        <!-- Open file -->
+        <button class="reader-btn" id="reader-open-btn" title="Open PDF (Ctrl+O)">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.43,51.2a16.14,16.14,0,0,0-9.6-3.2H48A16,16,0,0,0,32,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64ZM92.83,64l28.24,21.19A8,8,0,0,0,126,88h74v16H88a16,16,0,0,0-15.18,10.94L56,171.58V64Z"/></svg>
+        </button>
+
+        <div class="reader-toolbar-divider"></div>
+
+        <!-- Mode buttons -->
+        <div id="reader-mode-group" style="display:flex;gap:2px;">
+          <button class="reader-btn active" data-mode="pan" title="Pan / scroll">
+            <svg viewBox="0 0 256 256" fill="currentColor"><path d="M186.79,70.09A48,48,0,0,0,88.35,90.61,48,48,0,1,0,69.39,185.9l22.32-22.32A48,48,0,0,0,144,184a48.05,48.05,0,0,0,48-48V64A47.58,47.58,0,0,0,186.79,70.09ZM176,136a32,32,0,1,1-41.56-30.69A8,8,0,0,0,136,97.75V64a32,32,0,1,1,40,31V136Z"/></svg>
+          </button>
+          <button class="reader-btn" data-mode="highlight" title="Highlight — drag to mark">
+            <svg viewBox="0 0 256 256" fill="currentColor"><path d="M237.66,94.06,161.94,18.34a16,16,0,0,0-22.63,0L18.35,139.31a16.06,16.06,0,0,0,0,22.63l28.28,28.29-28.29,28.29a8,8,0,0,0,11.32,11.31l28.29-28.28,28.28,28.28a16,16,0,0,0,22.63,0l121-120.94A16,16,0,0,0,237.66,94.06Zm-11.32,11.31L105.37,226.35l-75.72-75.72L150.62,29.66Z"/></svg>
+          </button>
+          <button class="reader-btn" data-mode="note" title="Sticky note — click to place">
+            <svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H40A16,16,0,0,0,24,64V224a15.84,15.84,0,0,0,9.25,14.5A16.05,16.05,0,0,0,40,240a15.89,15.89,0,0,0,10.25-3.78.69.69,0,0,0,.13-.11L82.51,208H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM40,224h0ZM216,192H82.51a16,16,0,0,0-10.25,3.7l-.13.11L40,224V64H216ZM88,112a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H96A8,8,0,0,1,88,112Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H96A8,8,0,0,1,88,144Z"/></svg>
+          </button>
+          <button class="reader-btn" data-mode="ink" title="Draw — freehand ink">
+            <svg viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31l48.4-48.4,4,9.73a8,8,0,0,0,14.85-6.08l-5.83-14.2,23.91-23.91,9.19,3.77a8,8,0,1,0,6.07-14.81l-4.55-1.87,35-35A16,16,0,0,0,227.32,73.37ZM48,208V163.31l44.69,44.7ZM104,200.07,55.94,152,136,72l48,48Z"/></svg>
+          </button>
         </div>
-        <label class="reader-color-swatch" title="Annotation color">
+
+        <!-- Color swatch -->
+        <label class="reader-color-swatch" id="reader-color-swatch" title="Annotation color" style="background:#f2c40c;">
           <input type="color" id="reader-color" value="#f2c40c" />
         </label>
-        <button class="reader-btn" id="reader-undo-btn" title="Undo last mark on this page (Ctrl/Cmd+Z)">Undo</button>
-        <button class="reader-btn" id="reader-save-btn" title="Save annotations (Ctrl/Cmd+S)">
-          Save <i class="dirty-dot" id="reader-dirty-dot"></i>
+
+        <div class="reader-toolbar-divider"></div>
+
+        <!-- Undo -->
+        <button class="reader-btn" id="reader-undo-btn" title="Undo (Ctrl+Z)">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a96,96,0,0,1-96,96H72a8,8,0,0,1,0-16h56a80,80,0,1,0-72.25-45.6,8,8,0,1,1-14.4,7A96,96,0,1,1,224,128ZM115.32,68.69a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,0,11.32l32,32a8,8,0,0,0,11.32-11.32L91.31,109.32l48.37,0a8,8,0,0,0,0-16l-48.37,0,24-24A8,8,0,0,0,115.32,68.69Z"/></svg>
+        </button>
+
+        <!-- Save -->
+        <button class="reader-btn" id="reader-save-btn" title="Save annotations (Ctrl+S)">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M219.31,72,184,36.69A15.86,15.86,0,0,0,172.69,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V83.31A15.86,15.86,0,0,0,219.31,72ZM168,208H88V152h80Zm40,0H184V152a16,16,0,0,0-16-16H88a16,16,0,0,0-16,16v56H48V48H172.69L208,83.31ZM160,72a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h56A8,8,0,0,1,160,72Z"/></svg>
+          <i class="dirty-dot"></i>
         </button>
       </div>
 
@@ -837,7 +851,7 @@
 
     <div class="reader-stage mode-pan" id="reader-stage">
       <div class="reader-empty visible" id="reader-empty">
-        <div class="re-icon">📖</div>
+        <div class="re-icon">▤</div>
         <p>Open a PDF to read, highlight, add sticky notes, and draw on it.</p>
         <button class="btn-primary reader-empty-btn" id="reader-empty-open-btn">Choose PDF File</button>
       </div>
@@ -850,11 +864,22 @@
       </div>
     </div>
 
-    <!-- Sticky-note text input popup -->
+    <!-- Sticky-note text popup — click an empty spot to add, click an
+         existing note icon to view/edit/delete it. -->
     <div class="reader-note-popup" id="reader-note-popup">
-      <input id="reader-note-input" type="text" placeholder="Note text…" />
-      <button id="reader-note-ok" title="Add">✓</button>
-      <button id="reader-note-cancel" title="Cancel">✕</button>
+      <textarea id="reader-note-input" placeholder="Note…" rows="3"></textarea>
+      <div class="reader-note-actions">
+        <button id="reader-note-delete" title="Delete note">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM192,208H64V64H192ZM80,24a8,8,0,0,1,8-8h80a8,8,0,0,1,0,16H88A8,8,0,0,1,80,24Z"/></svg>
+        </button>
+        <span class="spacer"></span>
+        <button id="reader-note-cancel" title="Cancel (Esc)">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg>
+        </button>
+        <button id="reader-note-ok" title="Save (Ctrl+Enter)">
+          <svg viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="reader-statusbar" id="reader-statusbar">
@@ -964,7 +989,7 @@ const TOOLS = [
   },
   {
     id: 'pdf-to-images',
-    icon: '🖼',
+    icon: '▣',
     name: 'PDF to Images',
     hint: 'Export each page as a PNG',
     desc: 'Render each PDF page as a PNG image, saved next to the source file.',
@@ -972,7 +997,7 @@ const TOOLS = [
   },
   {
     id: 'images-to-pdf',
-    icon: '📑',
+    icon: '▦',
     name: 'Images to PDF',
     hint: 'Combine images into a PDF',
     desc: 'Combine multiple PNG / JPG images into a single PDF, one image per page.',
@@ -989,7 +1014,7 @@ const TOOLS = [
   },
   {
     id: 'read',
-    icon: '📖',
+    icon: '▤',
     name: 'Read & Annotate',
     hint: 'View pages, highlight, and mark up',
     desc: 'Open a PDF to read, highlight, add sticky notes, and draw on it. Marks are saved next to the file, not into it.',
@@ -1014,7 +1039,6 @@ const mainEl     = document.getElementById('main');
 const home       = document.getElementById('home');
 const taskView   = document.getElementById('task-view');
 const taskTitle  = document.getElementById('task-title');
-const taskDesc   = document.getElementById('task-desc');
 const taskBody   = document.getElementById('task-body');
 const backBtn    = document.getElementById('back-btn');
 const toolGrid   = document.getElementById('tool-grid');
@@ -1039,7 +1063,6 @@ function renderHome() {
         <div class="name">${readerTool.name}</div>
         <div class="hint">${readerTool.hint}</div>
       </div>
-      <div class="re-chevron">›</div>
     `;
     entry.addEventListener('click', () => openTool(readerTool.id));
     readingSlot.appendChild(entry);
@@ -1055,6 +1078,30 @@ function renderHome() {
       <div class="hint">${tool.hint}</div>
     `;
     card.addEventListener('click', () => openTool(tool.id));
+
+    // Drop directly onto a card → open that tool with the dropped files
+    card.addEventListener('dragover', e => {
+      if (e.dataTransfer.types.includes('Files')) {
+        e.preventDefault();
+        e.stopPropagation();
+        card.classList.add('drag-target');
+      }
+    });
+    card.addEventListener('dragleave', e => {
+      if (!card.contains(e.relatedTarget)) {
+        card.classList.remove('drag-target');
+      }
+    });
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.remove('drag-target');
+      dropOverlay.classList.remove('active');
+      // Files from the OS won't carry real paths in a webview;
+      // open the native picker pre-targeted at this tool's operation.
+      openTool(tool.id);
+    });
+
     toolGrid.appendChild(card);
   });
 }
@@ -1082,7 +1129,6 @@ function openTool(id, droppedFiles) {
   home.classList.add('hidden');
   taskView.classList.add('active');
   taskTitle.textContent = currentTool.name;
-  taskDesc.textContent  = currentTool.desc;
 
   renderTask();
 }
@@ -1165,7 +1211,7 @@ function makeDropZone() {
     ? 'Supports PNG / JPG / WebP — processed locally'
     : 'Files are processed locally — nothing is uploaded to any server';
   zone.innerHTML = `
-    <div class="dz-icon">${isImg ? '🖼' : '📄'}</div>
+    <div class="dz-icon">${isImg ? '▦' : '▭'}</div>
     <div class="dz-text">${hint}</div>
     <div class="dz-hint">${subhint}</div>
   `;
@@ -1235,7 +1281,7 @@ function renderFileList() {
     const isReorder = currentTool.needsReorder;
     item.innerHTML = `
       ${isReorder ? '<span class="fi-drag" title="Drag to reorder">⠿</span>' : ''}
-      <span class="fi-icon">📄</span>
+      <span class="fi-icon">▭</span>
       <span class="fi-name" title="${f.path || f.name}">${f.name}</span>
       <button class="fi-remove" data-idx="${i}" title="Remove">✕</button>
     `;
@@ -1748,7 +1794,6 @@ let readerAnnotations = {};      // { "1": [ {type,...}, ... ], ... }
 let readerDragStart = null;      // in-progress highlight rect (PDF pt space)
 let readerInkDrawing = null;     // in-progress ink stroke (array of PDF pt points)
 let readerDirty = false;
-let readerNotePopupResolver = null;
 
 const readerControls    = document.getElementById('reader-controls');
 const readerDocTitleEl  = document.getElementById('reader-doc-title');
@@ -1815,8 +1860,7 @@ function openReader() {
   readerEmpty.classList.add('visible');
   readerDocTitleEl.textContent = '';
   readerSaveBtn.classList.remove('dirty');
-  readerNotePopup.classList.remove('visible');
-  readerNotePopupResolver = null;
+  hideReaderNotePopup();
 }
 
 function pickAndOpenReaderPdf() {
@@ -2026,38 +2070,110 @@ async function leaveReaderSafely(next) {
   next();
 }
 
-// ── Note popup (custom, avoids relying on window.prompt in a webview) ──
-function showReaderNotePopup(screenX, screenY) {
-  readerNotePopup.style.left = screenX + 'px';
-  readerNotePopup.style.top = screenY + 'px';
+// ── Note popup ──────────────────────────────────
+// A click on empty canvas (in Note mode) creates a new note; a click on an
+// existing note icon reopens this same popup pre-filled with its text, so
+// notes can be read back and edited later — not just written once and
+// forgotten. `readerNoteEditIndex` is the index of the note being edited
+// within the current page's annotation array, or -1 while creating a new
+// one; the popup's Save/Delete/Cancel buttons branch on that.
+let readerNoteEditIndex = -1;
+const readerNoteDeleteBtn = document.getElementById('reader-note-delete');
+
+const NOTE_HIT_RADIUS = 12; // canvas px — matches the drawn icon's radius (9) plus a little slack for easy clicking
+
+function findNoteAt(canvasX, canvasY) {
+  const list = readerAnnotations[String(readerPage)] || [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const a = list[i];
+    if (a.type !== 'note') continue;
+    const p = readerPtToPx(a.point.x, a.point.y);
+    const dx = p.x - canvasX, dy = p.y - canvasY;
+    if (dx * dx + dy * dy <= NOTE_HIT_RADIUS * NOTE_HIT_RADIUS) return i;
+  }
+  return -1;
+}
+
+function showReaderNotePopup(screenX, screenY, existingText) {
+  const isEditing = existingText !== undefined;
+  readerNotePopup.classList.toggle('editing', isEditing);
+  readerNoteInput.value = isEditing ? existingText : '';
+
+  // Render off-screen first so we can measure it, then clamp inside the
+  // viewport — a 220px-wide popup opened near the right/bottom edge would
+  // otherwise be cut off or push the window's own scrollbars around.
+  readerNotePopup.style.left = '-9999px';
+  readerNotePopup.style.top  = '-9999px';
   readerNotePopup.classList.add('visible');
-  readerNoteInput.value = '';
+  const w = readerNotePopup.offsetWidth;
+  const h = readerNotePopup.offsetHeight;
+  const x = Math.min(screenX, window.innerWidth  - w - 12);
+  const y = Math.min(screenY, window.innerHeight - h - 12);
+  readerNotePopup.style.left = Math.max(8, x) + 'px';
+  readerNotePopup.style.top  = Math.max(8, y) + 'px';
+
   readerNoteInput.focus();
-  return new Promise(resolve => { readerNotePopupResolver = resolve; });
+  readerNoteInput.setSelectionRange(readerNoteInput.value.length, readerNoteInput.value.length);
 }
 
 function hideReaderNotePopup() {
-  readerNotePopup.classList.remove('visible');
-  readerNotePopupResolver = null;
+  readerNotePopup.classList.remove('visible', 'editing');
+  readerNoteEditIndex = -1;
 }
 
-document.getElementById('reader-note-ok').addEventListener('click', () => {
-  const val = readerNoteInput.value.trim();
-  if (readerNotePopupResolver) readerNotePopupResolver(val || null);
+function saveNotePopup() {
+  const text = readerNoteInput.value.trim();
+  const key = String(readerPage);
+
+  if (readerNoteEditIndex >= 0) {
+    // Editing an existing note.
+    const list = readerAnnotations[key];
+    if (!text) {
+      list.splice(readerNoteEditIndex, 1); // emptied out → remove it
+    } else {
+      list[readerNoteEditIndex].text = text;
+    }
+    redrawReaderAnnotations();
+    markReaderDirty();
+  } else if (text) {
+    // New note — position was stashed when the popup was opened.
+    pushReaderAnnotation({ type: 'note', color: readerColor, point: pendingNotePoint, text });
+  }
   hideReaderNotePopup();
-});
-document.getElementById('reader-note-cancel').addEventListener('click', () => {
-  if (readerNotePopupResolver) readerNotePopupResolver(null);
+}
+
+function deleteNotePopup() {
+  if (readerNoteEditIndex >= 0) {
+    readerAnnotations[String(readerPage)].splice(readerNoteEditIndex, 1);
+    redrawReaderAnnotations();
+    markReaderDirty();
+  }
   hideReaderNotePopup();
-});
+}
+
+document.getElementById('reader-note-ok').addEventListener('click', saveNotePopup);
+document.getElementById('reader-note-cancel').addEventListener('click', hideReaderNotePopup);
+readerNoteDeleteBtn.addEventListener('click', deleteNotePopup);
 readerNoteInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('reader-note-ok').click();
-  if (e.key === 'Escape') document.getElementById('reader-note-cancel').click();
+  if (e.key === 'Escape') { e.preventDefault(); hideReaderNotePopup(); }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveNotePopup(); }
+  // Plain Enter inserts a newline — this is a multi-line note, not a
+  // single-line field, so Enter shouldn't submit.
 });
 
-async function addReaderNoteAt(pt, screenX, screenY) {
-  const text = await showReaderNotePopup(screenX, screenY);
-  if (text) pushReaderAnnotation({ type: 'note', color: readerColor, point: pt, text });
+let pendingNotePoint = null; // pt-space position for a note not yet saved
+
+function addOrEditReaderNoteAt(pt, canvasX, canvasY, screenX, screenY) {
+  const hitIdx = findNoteAt(canvasX, canvasY);
+  if (hitIdx >= 0) {
+    readerNoteEditIndex = hitIdx;
+    const existing = readerAnnotations[String(readerPage)][hitIdx];
+    showReaderNotePopup(screenX, screenY, existing.text);
+  } else {
+    readerNoteEditIndex = -1;
+    pendingNotePoint = pt;
+    showReaderNotePopup(screenX, screenY);
+  }
 }
 
 // ── Pointer interaction on the annotation canvas ──
@@ -2070,7 +2186,7 @@ readerAnnotCanvas.addEventListener('pointerdown', evt => {
     readerDragStart = pt;
     readerAnnotCanvas.setPointerCapture(evt.pointerId);
   } else if (readerMode === 'note') {
-    addReaderNoteAt(pt, evt.clientX, evt.clientY);
+    addOrEditReaderNoteAt(pt, x, y, evt.clientX, evt.clientY);
   } else if (readerMode === 'ink') {
     readerInkDrawing = [pt];
     readerAnnotCanvas.setPointerCapture(evt.pointerId);
@@ -2117,21 +2233,24 @@ readerAnnotCanvas.addEventListener('pointerleave', () => {
 
 // ── Toolbar wiring ─────────────────────────────
 function updateReaderModeButtons() {
-  document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
-    chip.classList.toggle('selected', chip.dataset.mode === readerMode);
+  document.querySelectorAll('#reader-mode-group .reader-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === readerMode);
   });
   readerStage.classList.remove('mode-pan', 'mode-highlight', 'mode-note', 'mode-ink');
   readerStage.classList.add('mode-' + readerMode);
 }
 
-document.querySelectorAll('#reader-mode-group .rotate-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    readerMode = chip.dataset.mode;
+document.querySelectorAll('#reader-mode-group .reader-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    readerMode = btn.dataset.mode;
     updateReaderModeButtons();
   });
 });
 
-document.getElementById('reader-color').addEventListener('input', e => { readerColor = e.target.value; });
+document.getElementById('reader-color').addEventListener('input', e => {
+  readerColor = e.target.value;
+  document.getElementById('reader-color-swatch').style.background = readerColor;
+});
 
 document.getElementById('reader-open-btn').addEventListener('click', () => leaveReaderSafely(pickAndOpenReaderPdf));
 document.getElementById('reader-empty-open-btn').addEventListener('click', pickAndOpenReaderPdf);
@@ -2202,13 +2321,15 @@ document.addEventListener('drop', e => {
     return;
   }
 
-  // On home screen
+  // On home screen — route based on what was dropped
   if (images.length > 0 && pdfs.length === 0) {
     openTool('images-to-pdf', images);
   } else if (pdfs.length > 1) {
     openTool('merge', pdfs);
   } else if (pdfs.length === 1) {
-    openTool('merge', pdfs);
+    // Single PDF: open the most common single-file operation (compress).
+    // The user can switch tools from within that view.
+    openTool('compress', pdfs);
   }
 });
 </script>

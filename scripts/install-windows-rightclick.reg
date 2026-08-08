@@ -24,14 +24,20 @@ Windows Registry Editor Version 5.00
 [HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\02_to_images\command]
 @="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" to-images \"%1\"\""
 
-[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_watermark]
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_split]
+@="Split PDF (pages 1-1)"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_split\command]
+@="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" split \"%1\" --start 1 --end 1 -o \"%~dpn1_split.pdf\"\""
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_watermark]
 @="Add Watermark (Confidential)"
 
-[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\03_watermark\command]
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_watermark\command]
 @="cmd.exe /c \"\"%ProgramFiles%\\OhPDF\\ohpdf.exe\" watermark \"%1\" \"%~dpn1_watermarked.pdf\" -t Confidential\""
 
-[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_open_gui]
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\05_open_gui]
 @="Open in OhPDF..."
 
-[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\04_open_gui\command]
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\OhPDF\shell\05_open_gui\command]
 @="\"%ProgramFiles%\\OhPDF\\ohpdf-desktop.exe\""

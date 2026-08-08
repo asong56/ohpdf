@@ -76,6 +76,26 @@ Selection=Any
 Extensions=pdf;
 NEMO
 
+cat > "$NEMO_DIR/ohpdf-merge.nemo_action" << 'NEMO'
+[Nemo Action]
+Name=OhPDF — Merge Selected
+Comment=Merge selected PDFs into one
+Exec=bash -c '/usr/local/bin/ohpdf merge "$@" -o "$(dirname "$1")/merged.pdf" && notify-send OhPDF "Merged → $(dirname "$1")/merged.pdf"' _ %F
+Icon-Name=document-save
+Selection=S
+Extensions=pdf;
+NEMO
+
+cat > "$NEMO_DIR/ohpdf-split.nemo_action" << 'NEMO'
+[Nemo Action]
+Name=OhPDF — Split (first page)
+Comment=Split out the first page as a new PDF
+Exec=bash -c 'f=%f; /usr/local/bin/ohpdf split "$f" --start 1 --end 1 -o "${f%.pdf}_split.pdf" && notify-send OhPDF "Split → ${f%.pdf}_split.pdf"'
+Icon-Name=edit-cut
+Selection=S
+Extensions=pdf;
+NEMO
+
 echo "  ✓ Nemo actions installed"
 
 echo ""
