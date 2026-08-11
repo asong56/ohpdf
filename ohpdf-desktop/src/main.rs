@@ -8,12 +8,44 @@ use tao::{
     event_loop::{ControlFlow, EventLoopBuilder},
     window::WindowBuilder,
 };
-use wry::{WebContext, WebViewBuilder};
+use wry::{
+    http::{header::CONTENT_TYPE, Request, Response},
+    WebContext, WebViewBuilder,
+};
 
 mod ipc;
 
 #[derive(Debug)]
 pub struct WakeUp;
+
+// Assets are embedded at compile time so the binary stays self-contained.
+// Adding a new UI file only requires an entry here + a <link>/<script> in index.html.
+static INDEX_HTML: &[u8] = include_bytes!("../ui/index.html");
+static STYLES_CSS: &[u8] = include_bytes!("../ui/styles.css");
+static SCRIPTS_JS: &[u8] = include_bytes!("../ui/scripts.js");
+
+fn serve_asset(request: Request<Vec<u8>>) -> Response<Vec<u8>> {
+    let path = request.uri().path().trim_start_matches('/');
+
+    let (body, mime): (&[u8], &str) = match path {
+        "" | "index.html" => (INDEX_HTML, "text/html; charset=utf-8"),
+        "styles.css"      => (STYLES_CSS, "text/css; charset=utf-8"),
+        "scripts.js"      => (SCRIPTS_JS, "application/javascript; charset=utf-8"),
+        _ => {
+            return Response::builder()
+                .status(404)
+                .header(CONTENT_TYPE, "text/plain")
+                .body(b"Not found".to_vec())
+                .unwrap();
+        }
+    };
+
+    Response::builder()
+        .status(200)
+        .header(CONTENT_TYPE, mime)
+        .body(body.to_vec())
+        .unwrap()
+}
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -26,8 +58,6 @@ fn main() -> anyhow::Result<()> {
         .with_min_inner_size(LogicalSize::new(640, 480))
         .build(&event_loop)?;
 
-    let html = include_str!("../ui/index.html");
-
     let data_dir = dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
         .join("OhPDF")
@@ -38,8 +68,11 @@ fn main() -> anyhow::Result<()> {
     let proxy = event_loop.create_proxy();
     let handler = ipc::make_handler(tx, proxy);
 
+    // ohpdf:// is the virtual scheme. On Windows it resolves to http://ohpdf.localhost/
+    // so relative <link href="styles.css"> and <script src="scripts.js"> work on all platforms.
     let webview = WebViewBuilder::with_web_context(&mut web_context)
-        .with_html(html)
+        .with_custom_protocol("ohpdf".into(), |_id, req| serve_asset(req))
+        .with_url("ohpdf://localhost/")
         .with_ipc_handler(handler)
         .with_devtools(cfg!(debug_assertions))
         .build(&window)?;
