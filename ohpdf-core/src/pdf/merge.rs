@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
-use super::pdf_ops::{compact_write_options, copy_page};
+use super::pdf_ops::{compact_write_options, copy_page, path_str};
 
 /// Merge multiple PDF files into a single output PDF, in the order given.
 pub fn merge(inputs: &[PathBuf], output: &Path) -> Result<()> {
@@ -11,7 +11,7 @@ pub fn merge(inputs: &[PathBuf], output: &Path) -> Result<()> {
     let mut out_doc = PdfDocument::new();
 
     for path in inputs {
-        let src = PdfDocument::open(path.to_str().context("Path contains invalid characters.")?)
+        let src = PdfDocument::open(path_str(path)?)
             .with_context(|| format!("Failed to open file: {}", path.display()))?;
 
         let page_count = src
@@ -33,10 +33,7 @@ pub fn merge(inputs: &[PathBuf], output: &Path) -> Result<()> {
     }
 
     out_doc
-        .save_with_options(
-            output.to_str().context("Output path contains invalid characters.")?,
-            compact_write_options(),
-        )
+        .save_with_options(path_str(output)?, compact_write_options())
         .context("Failed to save merged file.")?;
 
     log::info!("Merged {} files → {}", inputs.len(), output.display());

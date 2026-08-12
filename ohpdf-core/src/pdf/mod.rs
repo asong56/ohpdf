@@ -23,3 +23,5 @@ pub use reader::render_page;
 pub use split::split;
 pub use thumbnails::pdf_page_thumbnails;
 pub use watermark::{add_watermark, WatermarkOptions};
+
+pub use pdf_ops::path_str;

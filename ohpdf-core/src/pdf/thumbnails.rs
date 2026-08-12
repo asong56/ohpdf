@@ -1,7 +1,8 @@
 use std::path::Path;
 use anyhow::{Context, Result};
-use base64::Engine;
-use mupdf::{Colorspace, Document, ImageFormat, Matrix};
+use mupdf::Document;
+
+use super::pdf_ops::{path_str, render_page_to_data_url};
 
 /// One rendered page thumbnail, ready to drop straight into an `<img src>`.
 pub struct Thumbnail {
@@ -26,10 +27,8 @@ pub struct Thumbnail {
 /// in to base64-encode it; the temp file is removed right after.
 pub fn pdf_page_thumbnails(input: &Path) -> Result<Vec<Thumbnail>> {
     const THUMB_DPI: u32 = 72; // small on purpose — these are previews, not exports
-    let scale = THUMB_DPI as f32 / 72.0;
-    let matrix = Matrix::new_scale(scale, scale);
 
-    let doc = Document::open(input.to_str().context("Path contains invalid characters.")?)
+    let doc = Document::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let page_count = doc.page_count().context("Failed to get page count.")?;
@@ -40,7 +39,6 @@ pub fn pdf_page_thumbnails(input: &Path) -> Result<Vec<Thumbnail>> {
     // sharing it across threads), so a single reused path is enough; no
     // need for a uniquely-numbered filename per page.
     let tmp_path = tmp_dir.path().join("thumb.png");
-    let tmp_path_str = tmp_path.to_string_lossy();
 
     let mut thumbs = Vec::with_capacity(page_count as usize);
 
@@ -49,24 +47,8 @@ pub fn pdf_page_thumbnails(input: &Path) -> Result<Vec<Thumbnail>> {
             .load_page(i)
             .with_context(|| format!("Failed to load page {}.", i + 1))?;
 
-        let pixmap = page
-            .to_pixmap(&matrix, &Colorspace::device_rgb(), false, true)
-            .with_context(|| format!("Failed to render page {}.", i + 1))?;
-
-        pixmap
-            .save_as(&tmp_path_str, ImageFormat::PNG)
+        let data_url = render_page_to_data_url(&page, THUMB_DPI, &tmp_path)
             .with_context(|| format!("Failed to render thumbnail for page {}.", i + 1))?;
-
-        let bytes = std::fs::read(&tmp_path)
-            .with_context(|| format!("Failed to read rendered thumbnail for page {}.", i + 1))?;
-
-        // `data:image/png;base64,` is 22 bytes; base64 inflates the source
-        // by ~4/3. Pre-sizing the output string avoids the Vec-style
-        // reallocate-and-copy growth `format!` would otherwise do as the
-        // encoded data is appended.
-        let mut data_url = String::with_capacity(22 + (bytes.len() * 4 / 3) + 4);
-        data_url.push_str("data:image/png;base64,");
-        base64::engine::general_purpose::STANDARD.encode_string(&bytes, &mut data_url);
 
         thumbs.push(Thumbnail {
             page: (i + 1) as u32,

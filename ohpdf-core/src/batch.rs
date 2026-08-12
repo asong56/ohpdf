@@ -81,18 +81,7 @@ where
     // MergeAll is special — one output for all inputs.
     if let BatchOp::MergeAll { ref output_name } = op {
         let output = output_dir.join(output_name);
-        let result = match merge(&pdfs, &output) {
-            Ok(_) => FileResult {
-                input: input_dir.to_path_buf(),
-                output: output.clone(),
-                error: None,
-            },
-            Err(e) => FileResult {
-                input: input_dir.to_path_buf(),
-                output: output.clone(),
-                error: Some(e.to_string()),
-            },
-        };
+        let result = to_file_result(input_dir.to_path_buf(), output.clone(), merge(&pdfs, &output));
         on_progress(&result);
         return Ok(vec![result]);
     }
@@ -100,31 +89,30 @@ where
     let mut results = Vec::with_capacity(pdfs.len());
 
     for src in &pdfs {
-        let stem = src
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy();
+        let stem = src.file_stem().unwrap_or_default().to_string_lossy();
         let suffix = op_suffix(&op);
         let out = output_dir.join(format!("{}_{}.pdf", stem, suffix));
 
         let outcome = apply_op(src, &out, &op);
-        let result = match outcome {
-            Ok(_) => FileResult {
-                input: src.clone(),
-                output: out,
-                error: None,
-            },
-            Err(e) => FileResult {
-                input: src.clone(),
-                output: out,
-                error: Some(e.to_string()),
-            },
-        };
+        let result = to_file_result(src.clone(), out, outcome);
         on_progress(&result);
         results.push(result);
     }
 
     Ok(results)
+}
+
+/// Turns an operation's `Result<()>` into a `FileResult` — the same
+/// input/output pair either way, `error` populated only on failure. Shared
+/// by both the `MergeAll` (single-file) and per-file loop branches above,
+/// which previously each matched on their own `Result` to build this by
+/// hand.
+fn to_file_result(input: PathBuf, output: PathBuf, outcome: Result<()>) -> FileResult {
+    FileResult {
+        input,
+        output,
+        error: outcome.err().map(|e| e.to_string()),
+    }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

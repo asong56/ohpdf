@@ -1,29 +1,22 @@
-use super::report;
+use super::{parse_args, report, ArgSpec};
 use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use ohpdf_core::pdf;
 
-pub fn run(args: &[String]) -> Result<()> {
-    let mut input = None;
-    let mut output = None;
-    let mut start = None;
-    let mut end = None;
+const OUTPUT: ArgSpec = ArgSpec { names: &["-o", "--output"] };
+const START: ArgSpec = ArgSpec { names: &["--start"] };
+const END: ArgSpec = ArgSpec { names: &["--end"] };
 
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-o" | "--output" => { output = args.get(i + 1).cloned(); i += 2; }
-            "--start" => { start = args.get(i + 1).and_then(|s| s.parse::<u32>().ok()); i += 2; }
-            "--end" => { end = args.get(i + 1).and_then(|s| s.parse::<u32>().ok()); i += 2; }
-            arg if !arg.starts_with('-') => { input = Some(arg.to_string()); i += 1; }
-            arg => return Err(anyhow!("Unknown option: {}", arg)),
-        }
-    }
+pub fn run(args: &[String]) -> Result<()> {
+    let (input, values) = parse_args(args, &[OUTPUT, START, END])?;
+    let [output, start, end] = values.try_into().unwrap();
 
     let input = input.ok_or_else(|| anyhow!("Usage: ohpdf-cli split <in.pdf> --start N --end M -o <out.pdf>"))?;
     let output = output.ok_or_else(|| anyhow!("Missing -o/--output <path>"))?;
-    let start = start.ok_or_else(|| anyhow!("Missing --start <page>"))?;
-    let end = end.ok_or_else(|| anyhow!("Missing --end <page>"))?;
+    let start: u32 = start.ok_or_else(|| anyhow!("Missing --start <page>"))?
+        .parse().map_err(|_| anyhow!("--start must be a page number"))?;
+    let end: u32 = end.ok_or_else(|| anyhow!("Missing --end <page>"))?
+        .parse().map_err(|_| anyhow!("--end must be a page number"))?;
 
     let input_path = PathBuf::from(&input);
     if !input_path.exists() {
@@ -31,6 +24,6 @@ pub fn run(args: &[String]) -> Result<()> {
     }
 
     pdf::split(&input_path, &[(start, end)], &[PathBuf::from(&output)])?;
-    report(&input_path, &std::path::PathBuf::from(&output));
+    report(&input_path, &PathBuf::from(&output));
     Ok(())
 }

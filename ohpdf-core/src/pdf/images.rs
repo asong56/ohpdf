@@ -6,7 +6,7 @@ use mupdf::{
     Size,
 };
 
-use super::pdf_ops::compact_write_options;
+use super::pdf_ops::{compact_write_options, path_str};
 
 /// Render every page of a PDF as PNG images.
 ///
@@ -17,7 +17,7 @@ use super::pdf_ops::compact_write_options;
 /// If `output_dir` is `Some(dir)`, images are saved into that directory instead
 /// (the directory is created if it doesn't exist).
 pub fn pdf_to_images(input: &Path, dpi: u32, output_dir: Option<&Path>) -> Result<Vec<PathBuf>> {
-    let src = Document::open(input.to_str().context("Path contains invalid characters.")?)
+    let src = Document::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let page_count = src.page_count().context("Failed to get page count.")?;
@@ -83,7 +83,7 @@ pub fn images_to_pdf(images: &[PathBuf], output: &Path) -> Result<()> {
             img_path.display()
         );
 
-        let image = Image::from_file(img_path.to_str().context("Image path contains invalid characters.")?)
+        let image = Image::from_file(path_str(img_path)?)
             .with_context(|| format!("Failed to read image: {}", img_path.display()))?;
 
         let w = image.width() as f32;
@@ -102,11 +102,8 @@ pub fn images_to_pdf(images: &[PathBuf], output: &Path) -> Result<()> {
         .with_context(|| format!("Failed to insert image: {}", img_path.display()))?;
     }
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        compact_write_options(),
-    )
-    .context("Failed to save PDF.")?;
+    doc.save_with_options(path_str(output)?, compact_write_options())
+        .context("Failed to save PDF.")?;
 
     log::info!("Combined {} images -> {}", images.len(), output.display());
     Ok(())

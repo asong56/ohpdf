@@ -3,11 +3,11 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
-use super::pdf_ops::{compact_write_options, copy_pages_to_new_doc};
+use super::pdf_ops::{compact_write_options, copy_pages_to_new_doc, path_str};
 
 /// Get total page count of a PDF.
 pub fn page_count(input: &Path) -> Result<u32> {
-    let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
     let count = doc.page_count().context("Failed to get page count.")? as u32;
     Ok(count)
@@ -37,7 +37,7 @@ fn validate_pages(pages: &[u32], total: u32) -> Result<()> {
 pub fn delete_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     anyhow::ensure!(!pages.is_empty(), "At least one page must be specified.");
 
-    let mut doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let mut doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let total = doc.page_count().context("Failed to get page count.")? as u32;
@@ -57,11 +57,8 @@ pub fn delete_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
             .with_context(|| format!("Failed to delete page {}.", page_no))?;
     }
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        compact_write_options(),
-    )
-    .context("Failed to save file.")?;
+    doc.save_with_options(path_str(output)?, compact_write_options())
+        .context("Failed to save file.")?;
 
     log::info!(
         "Deleted {} pages from {} → {}",
@@ -77,7 +74,7 @@ pub fn delete_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
 pub fn extract_pages(input: &Path, output: &Path, pages: &[u32]) -> Result<()> {
     anyhow::ensure!(!pages.is_empty(), "At least one page must be specified.");
 
-    let src = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let src = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let total = src.page_count().context("Failed to get page count.")? as u32;
@@ -108,7 +105,7 @@ pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) ->
 
     let delta = ((degrees % 360) + 360) % 360;
 
-    let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let total = doc.page_count().context("Failed to get page count.")? as u32;
@@ -139,11 +136,8 @@ pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) ->
         }
     }
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        compact_write_options(),
-    )
-    .context("Failed to save file.")?;
+    doc.save_with_options(path_str(output)?, compact_write_options())
+        .context("Failed to save file.")?;
 
     log::info!(
         "Rotated {} pages by {}° in {} → {}",
@@ -165,7 +159,7 @@ pub fn rotate_pages(input: &Path, output: &Path, pages: &[u32], degrees: i32) ->
 pub fn reorder_pages(input: &Path, output: &Path, order: &[u32]) -> Result<()> {
     anyhow::ensure!(!order.is_empty(), "Page order cannot be empty.");
 
-    let src = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let src = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let total = src.page_count().context("Failed to get page count.")? as u32;

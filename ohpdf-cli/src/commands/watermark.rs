@@ -1,30 +1,22 @@
-use super::report;
+use super::{parse_args, report, ArgSpec};
 use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use ohpdf_core::pdf;
 
-pub fn run(args: &[String]) -> Result<()> {
-    let mut input = None;
-    let mut output = None;
-    let mut text = None;
-    let mut font_size = 60.0_f32;
-    let mut opacity = 0.15_f32;
+const OUTPUT: ArgSpec = ArgSpec { names: &["-o", "--output"] };
+const TEXT: ArgSpec = ArgSpec { names: &["--text"] };
+const FONT_SIZE: ArgSpec = ArgSpec { names: &["--font-size"] };
+const OPACITY: ArgSpec = ArgSpec { names: &["--opacity"] };
 
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-o" | "--output" => { output = args.get(i + 1).cloned(); i += 2; }
-            "--text" => { text = args.get(i + 1).cloned(); i += 2; }
-            "--font-size" => { font_size = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(60.0); i += 2; }
-            "--opacity" => { opacity = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(0.15); i += 2; }
-            arg if !arg.starts_with('-') => { input = Some(arg.to_string()); i += 1; }
-            arg => return Err(anyhow!("Unknown option: {}", arg)),
-        }
-    }
+pub fn run(args: &[String]) -> Result<()> {
+    let (input, values) = parse_args(args, &[OUTPUT, TEXT, FONT_SIZE, OPACITY])?;
+    let [output, text, font_size, opacity] = values.try_into().unwrap();
 
     let input = input.ok_or_else(|| anyhow!("Usage: ohpdf-cli watermark <in.pdf> -o <out.pdf> --text \"DRAFT\""))?;
     let output = output.ok_or_else(|| anyhow!("Missing -o/--output <path>"))?;
     let text = text.unwrap_or_else(|| "WATERMARK".to_string());
+    let font_size: f32 = font_size.and_then(|s| s.parse().ok()).unwrap_or(60.0);
+    let opacity: f32 = opacity.and_then(|s| s.parse().ok()).unwrap_or(0.15);
 
     let input_path = PathBuf::from(&input);
     if !input_path.exists() {
@@ -39,6 +31,6 @@ pub fn run(args: &[String]) -> Result<()> {
     };
 
     pdf::add_watermark(&input_path, &PathBuf::from(&output), &opts)?;
-    report(&input_path, &std::path::PathBuf::from(&output));
+    report(&input_path, &PathBuf::from(&output));
     Ok(())
 }

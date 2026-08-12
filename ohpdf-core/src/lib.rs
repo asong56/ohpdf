@@ -4,13 +4,9 @@
 pub mod pdf;
 pub mod batch;
 
-pub use pdf::annotations::{load_annotations, save_annotations, PageAnnotations};
-pub use pdf::compress::compress;
-pub use pdf::encrypt::{decrypt, encrypt};
-pub use pdf::images::{images_to_pdf, pdf_to_images};
-pub use pdf::merge::merge;
-pub use pdf::pages::{delete_pages, extract_pages, page_count, reorder_pages, rotate_pages};
-pub use pdf::reader::render_page;
-pub use pdf::split::split;
-pub use pdf::thumbnails::pdf_page_thumbnails;
-pub use pdf::watermark::{add_watermark, WatermarkOptions};
+// `pdf::mod` already re-exports every public item flatly (`pdf::merge`,
+// `pdf::compress`, ...); re-exporting the same list again here would just
+// be a second copy of the same list to keep in sync. `pub use pdf::*`
+// makes `ohpdf_core::merge(...)` etc. work directly from the crate root
+// too, with one list instead of two.
+pub use pdf::*;

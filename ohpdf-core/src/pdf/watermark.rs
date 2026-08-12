@@ -5,7 +5,7 @@ use mupdf::pdf::{PdfDocument, PdfPage};
 use mupdf::shape::{PdfColor, Shape, TextOptions};
 use mupdf::Point;
 
-use super::pdf_ops::compact_write_options;
+use super::pdf_ops::{compact_write_options, path_str};
 
 /// Watermark options.
 pub struct WatermarkOptions<'a> {
@@ -48,7 +48,7 @@ pub fn add_watermark(input: &Path, output: &Path, opts: &WatermarkOptions) -> Re
         "Opacity must be between 0 and 1."
     );
 
-    let mut doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let mut doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let page_count = doc.page_count().context("Failed to get page count.")?;
@@ -128,11 +128,8 @@ pub fn add_watermark(input: &Path, output: &Path, opts: &WatermarkOptions) -> Re
         }
     }
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        compact_write_options(),
-    )
-    .context("Failed to save watermarked file.")?;
+    doc.save_with_options(path_str(output)?, compact_write_options())
+        .context("Failed to save watermarked file.")?;
 
     log::info!(
         "Watermarked {} pages: \"{}\" → {}",

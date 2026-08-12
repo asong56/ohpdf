@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use mupdf::pdf::{Encryption, PdfDocument, PdfWriteOptions, Permission};
 
-use super::pdf_ops::compact_write_options;
+use super::pdf_ops::{compact_write_options, path_str};
 
 /// Add password protection to a PDF.
 ///
@@ -15,7 +15,7 @@ use super::pdf_ops::compact_write_options;
 pub fn encrypt(input: &Path, output: &Path, password: &str) -> Result<()> {
     anyhow::ensure!(!password.is_empty(), "Password cannot be empty.");
 
-    let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let mut opts = PdfWriteOptions::default();
@@ -34,17 +34,14 @@ pub fn encrypt(input: &Path, output: &Path, password: &str) -> Result<()> {
     opts.set_owner_password(password)
         .set_user_password(password);
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        opts,
-    )
-    .with_context(|| {
-        format!(
-            "Failed to save encrypted file to {} (source: {}).",
-            output.display(),
-            input.display()
-        )
-    })?;
+    doc.save_with_options(path_str(output)?, opts)
+        .with_context(|| {
+            format!(
+                "Failed to save encrypted file to {} (source: {}).",
+                output.display(),
+                input.display()
+            )
+        })?;
 
     log::info!("Encrypted {} → {}", input.display(), output.display());
     Ok(())
@@ -52,7 +49,7 @@ pub fn encrypt(input: &Path, output: &Path, password: &str) -> Result<()> {
 
 /// Remove password protection from a PDF.
 pub fn decrypt(input: &Path, output: &Path, password: &str) -> Result<()> {
-    let mut doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let mut doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let needs_pw = doc
@@ -74,17 +71,14 @@ pub fn decrypt(input: &Path, output: &Path, password: &str) -> Result<()> {
     let mut opts = compact_write_options();
     opts.set_encryption(Encryption::None);
 
-    doc.save_with_options(
-        output.to_str().context("Output path contains invalid characters.")?,
-        opts,
-    )
-    .with_context(|| {
-        format!(
-            "Failed to save decrypted file to {} (source: {}).",
-            output.display(),
-            input.display()
-        )
-    })?;
+    doc.save_with_options(path_str(output)?, opts)
+        .with_context(|| {
+            format!(
+                "Failed to save decrypted file to {} (source: {}).",
+                output.display(),
+                input.display()
+            )
+        })?;
 
     log::info!("Decrypted {} → {}", input.display(), output.display());
     Ok(())

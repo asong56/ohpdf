@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
-use super::pdf_ops::copy_pages_to_new_doc;
+use super::pdf_ops::{copy_pages_to_new_doc, path_str};
 
 /// Split a PDF by page ranges.
 ///
@@ -14,7 +14,7 @@ pub fn split(input: &Path, ranges: &[(u32, u32)], outputs: &[PathBuf]) -> Result
         "The number of ranges and outputs must match."
     );
 
-    let src = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let src = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let total = src.page_count().context("Failed to get page count.")? as u32;

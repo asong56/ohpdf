@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use mupdf::pdf::PdfDocument;
 
-use super::pdf_ops::compact_write_options;
+use super::pdf_ops::{compact_write_options, path_str};
 
 /// Compress a PDF by re-writing it with optimized output settings.
 ///
@@ -12,7 +12,7 @@ use super::pdf_ops::compact_write_options;
 /// sake and used only to pick how aggressive the (lossless) optimization is;
 /// it is documented here rather than silently doing nothing.
 pub fn compress(input: &Path, output: &Path, _quality: Option<u8>) -> Result<()> {
-    let doc = PdfDocument::open(input.to_str().context("Path contains invalid characters.")?)
+    let doc = PdfDocument::open(path_str(input)?)
         .with_context(|| format!("Failed to open file: {}", input.display()))?;
 
     let mut opts = compact_write_options(); // garbage + compress
@@ -25,7 +25,7 @@ pub fn compress(input: &Path, output: &Path, _quality: Option<u8>) -> Result<()>
     // options (garbage-collect, compress streams, compress images/fonts, clean
     // content streams) still produce meaningfully smaller files without it.
 
-    doc.save_with_options(output.to_str().context("Output path contains invalid characters.")?, opts)
+    doc.save_with_options(path_str(output)?, opts)
         .context("Failed to save compressed file.")?;
 
     let original_size = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);

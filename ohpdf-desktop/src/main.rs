@@ -1,6 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::borrow::Cow;
 use std::sync::mpsc;
 
 use tao::{
@@ -25,10 +24,10 @@ static INDEX_HTML: &[u8] = include_bytes!("../ui/index.html");
 static STYLES_CSS: &[u8] = include_bytes!("../ui/styles.css");
 static SCRIPTS_JS: &[u8] = include_bytes!("../ui/scripts.js");
 
-fn serve_asset(request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
+fn serve_asset(request: Request<Vec<u8>>) -> Response<Vec<u8>> {
     let path = request.uri().path().trim_start_matches('/');
 
-    let (body, mime): (&'static [u8], &str) = match path {
+    let (body, mime): (&[u8], &str) = match path {
         "" | "index.html" => (INDEX_HTML, "text/html; charset=utf-8"),
         "styles.css"      => (STYLES_CSS, "text/css; charset=utf-8"),
         "scripts.js"      => (SCRIPTS_JS, "application/javascript; charset=utf-8"),
@@ -36,7 +35,7 @@ fn serve_asset(request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
             return Response::builder()
                 .status(404)
                 .header(CONTENT_TYPE, "text/plain")
-                .body(Cow::Borrowed(b"Not found" as &[u8]))
+                .body(b"Not found".to_vec())
                 .unwrap();
         }
     };
@@ -44,7 +43,7 @@ fn serve_asset(request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
     Response::builder()
         .status(200)
         .header(CONTENT_TYPE, mime)
-        .body(Cow::Borrowed(body))
+        .body(body.to_vec())
         .unwrap()
 }
 

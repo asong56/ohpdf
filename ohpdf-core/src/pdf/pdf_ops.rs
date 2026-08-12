@@ -14,7 +14,54 @@
 
 use std::path::Path;
 use anyhow::{Context, Result};
+use base64::Engine;
 use mupdf::pdf::{PdfDocument, PdfGraftMap, PdfObject, PdfWriteOptions};
+use mupdf::{Colorspace, ImageFormat, Matrix, Page};
+
+/// `Path::to_str`, turned into the same "Path contains invalid characters."
+/// error every call site in this crate already raised by hand — mupdf-rs's
+/// APIs only take `&str`, not `&Path`, so this conversion (and its error
+/// message) was being repeated verbatim at every open/save call.
+pub fn path_str(path: &Path) -> Result<&str> {
+    path.to_str().context("Path contains invalid characters.")
+}
+
+/// Renders `page` (already loaded, 0-indexed internally by mupdf but that's
+/// the caller's concern) at `dpi` and returns it as a
+/// `data:image/png;base64,...` URL.
+///
+/// Shared by `reader::render_page` (one page, at the reader's current zoom)
+/// and `thumbnails::pdf_page_thumbnails` (every page, at a small fixed
+/// preview size) — both need the exact same "rasterize to `Pixmap` -> no
+/// in-memory PNG encode in this crate version, only `save_as(path, format)`
+/// -> write to a short-lived temp file -> read it back and base64-encode
+/// it" dance, previously duplicated between the two call sites.
+///
+/// `tmp_path` is provided by the caller (rather than created fresh here)
+/// because `thumbnails.rs` reuses a single path across every page in a
+/// document instead of allocating one temp file per page.
+pub fn render_page_to_data_url(page: &Page, dpi: u32, tmp_path: &Path) -> Result<String> {
+    let scale = dpi as f32 / 72.0; // MuPDF's native unit is 1/72 inch
+    let matrix = Matrix::new_scale(scale, scale);
+
+    let pixmap = page
+        .to_pixmap(&matrix, &Colorspace::device_rgb(), false, true)
+        .context("Failed to render page.")?;
+
+    pixmap
+        .save_as(&tmp_path.to_string_lossy(), ImageFormat::PNG)
+        .context("Failed to render page.")?;
+
+    let bytes = std::fs::read(tmp_path).context("Failed to read rendered page.")?;
+
+    // `data:image/png;base64,` is 22 bytes; base64 inflates the source by
+    // ~4/3. Pre-sizing avoids the reallocate-and-copy growth `format!`
+    // would otherwise do as the encoded data is appended.
+    let mut data_url = String::with_capacity(22 + (bytes.len() * 4 / 3) + 4);
+    data_url.push_str("data:image/png;base64,");
+    base64::engine::general_purpose::STANDARD.encode_string(&bytes, &mut data_url);
+    Ok(data_url)
+}
 
 /// Copies a single page (0-indexed `src_page_no`) from `src` into `dst`,
 /// inserting it at `insert_at` (`-1` to append at the end).
@@ -110,10 +157,7 @@ pub fn copy_pages_to_new_doc(src: &PdfDocument, page_numbers: &[u32], output: &P
     }
 
     out_doc
-        .save_with_options(
-            output.to_str().context("Output path contains invalid characters.")?,
-            compact_write_options(),
-        )
+        .save_with_options(path_str(output)?, compact_write_options())
         .context("Failed to save file.")?;
 
     Ok(())
