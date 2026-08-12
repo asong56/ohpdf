@@ -36,7 +36,7 @@ fn serve_asset(request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
             return Response::builder()
                 .status(404)
                 .header(CONTENT_TYPE, "text/plain")
-                .body(Cow::Borrowed(b"Not found"))
+                .body(Cow::Borrowed(b"Not found" as &[u8]))
                 .unwrap();
         }
     };
